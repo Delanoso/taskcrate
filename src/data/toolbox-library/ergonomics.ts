@@ -1,6 +1,6 @@
-import type { LibraryTalk } from "./types";
+import type { TalkBase } from "./types";
 
-export const ERGONOMICS: LibraryTalk[] = [
+export const ERGONOMICS: TalkBase[] = [
   {
     slug: "safe-lifting",
     category: "ergonomics",

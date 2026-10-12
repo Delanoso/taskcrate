@@ -1,6 +1,6 @@
-import type { LibraryTalk } from "./types";
+import type { TalkBase } from "./types";
 
-export const WAREHOUSE: LibraryTalk[] = [
+export const WAREHOUSE: TalkBase[] = [
   {
     slug: "forklift-pre-use",
     category: "warehouse",

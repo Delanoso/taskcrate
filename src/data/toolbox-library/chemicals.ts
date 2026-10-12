@@ -1,6 +1,6 @@
-import type { LibraryTalk } from "./types";
+import type { TalkBase } from "./types";
 
-export const CHEMICALS: LibraryTalk[] = [
+export const CHEMICALS: TalkBase[] = [
   {
     slug: "sds-sheets",
     category: "chemicals",

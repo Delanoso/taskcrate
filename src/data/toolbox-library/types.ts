@@ -15,7 +15,7 @@ export const TALK_CATEGORIES = {
 
 export type TalkCategory = keyof typeof TALK_CATEGORIES;
 
-export type LibraryTalk = {
+export type TalkBase = {
   slug: string;
   category: TalkCategory;
   title: string;
@@ -25,3 +25,14 @@ export type LibraryTalk = {
   remember: string;
   ask: string;
 };
+
+type Three = [string, string, string];
+
+export type TalkExtras = {
+  /** Real-world consequence: what happens when this goes wrong. */
+  why: string;
+  dos: Three;
+  donts: Three;
+};
+
+export type LibraryTalk = TalkBase & TalkExtras;
