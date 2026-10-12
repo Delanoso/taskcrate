@@ -14,6 +14,7 @@ import {
   parseJsonKeys,
   PERMIT_HAZARDS,
   PERMIT_PPE,
+  PERMIT_PRECAUTIONS,
 } from "@/lib/modules/permit-options";
 
 type PermitForPdf = {
@@ -32,6 +33,7 @@ type PermitForPdf = {
   lotoConfirmed?: boolean | null;
   barricadesConfirmed?: boolean | null;
   fireExtinguisherOk?: boolean | null;
+  precautionsJson?: string | null;
   ppeJson?: string | null;
   areaPhotoUrl?: string | null;
   equipmentPhotoUrl?: string | null;
@@ -278,11 +280,19 @@ export async function buildPermitClosedPdf(permit: PermitForPdf) {
   );
 
   heading("4. Precautions & risk controls");
-  checklist([
-    { label: "Energy isolation confirmed (LOTO)", on: !!permit.lotoConfirmed },
-    { label: "Barricades and warning signs in place", on: !!permit.barricadesConfirmed },
-    { label: "Fire extinguisher on standby", on: !!permit.fireExtinguisherOk },
-  ]);
+  const precautions = new Set(
+    permit.precautionsJson
+      ? parseJsonKeys(permit.precautionsJson)
+      : [
+          permit.lotoConfirmed && "loto",
+          permit.barricadesConfirmed && "barricades",
+          permit.fireExtinguisherOk && "extinguisher",
+        ].filter((k): k is string => !!k),
+  );
+  checklist(
+    PERMIT_PRECAUTIONS.map((p) => ({ label: p.label, on: precautions.has(p.key) })),
+    2,
+  );
   const ppe = parseJsonKeys(permit.ppeJson);
   field("Mandatory PPE", ppe.length ? labelKeys(ppe, PERMIT_PPE).join(", ") : "None selected");
 

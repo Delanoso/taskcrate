@@ -38,6 +38,50 @@ export const PERMIT_PPE = [
   { key: "harness", label: "Fall-arrest harness" },
 ] as const;
 
+/** `requiredFor`: hazard keys that make this precaution mandatory. */
+export const PERMIT_PRECAUTIONS: readonly {
+  key: string;
+  label: string;
+  requiredFor: readonly string[];
+}[] = [
+  {
+    key: "loto",
+    label: "Energy isolation: power, valves or locks engaged (LOTO)",
+    requiredFor: ["electrical", "mechanical", "pressure"],
+  },
+  { key: "zeroEnergy", label: "Zero-energy state tested after isolation", requiredFor: ["electrical", "pressure"] },
+  {
+    key: "barricades",
+    label: "Area barricaded and warning signs in place",
+    requiredFor: ["heights", "fallingObjects", "excavation", "lifting"],
+  },
+  { key: "extinguisher", label: "Fire extinguisher on standby", requiredFor: ["hotWork", "flammables"] },
+  { key: "fireWatch", label: "Fire watch person assigned", requiredFor: ["hotWork"] },
+  { key: "combustibles", label: "Combustibles removed or covered (10 m radius)", requiredFor: ["hotWork"] },
+  { key: "gasTest", label: "Gas / atmosphere test done and safe", requiredFor: ["confinedSpace", "flammables"] },
+  { key: "ventilation", label: "Ventilation or fume extraction in place", requiredFor: ["confinedSpace", "dust"] },
+  { key: "standby", label: "Standby / rescue person present", requiredFor: ["confinedSpace"] },
+  { key: "fallProtection", label: "Fall protection and anchor points inspected", requiredFor: ["heights"] },
+  { key: "ladders", label: "Ladders / scaffolding inspected and tagged", requiredFor: [] },
+  { key: "liftingGear", label: "Lifting gear inspected and certified", requiredFor: ["lifting"] },
+  { key: "services", label: "Underground services located; excavation shored", requiredFor: ["excavation"] },
+  { key: "traffic", label: "Traffic control / banksman in place", requiredFor: ["vehicles"] },
+  { key: "sds", label: "Safety data sheets (SDS) available", requiredFor: ["chemicals"] },
+  { key: "spillKit", label: "Spill kit available", requiredFor: [] },
+  { key: "toolsInspected", label: "Tools and equipment inspected before use", requiredFor: [] },
+  { key: "firstAid", label: "First aid kit and first aider available", requiredFor: [] },
+  { key: "emergency", label: "Emergency procedure and escape route known", requiredFor: [] },
+  { key: "briefing", label: "Workers briefed on hazards and controls", requiredFor: [] },
+];
+
+export function requiredPrecautions(hazardKeys: readonly string[]) {
+  return PERMIT_PRECAUTIONS.filter((p) => p.requiredFor.some((h) => hazardKeys.includes(h)));
+}
+
+export function isPrecautionKey(k: string) {
+  return PERMIT_PRECAUTIONS.some((p) => p.key === k);
+}
+
 export const PERMIT_MAX_DURATION_MS = 24 * 60 * 60 * 1000;
 export const PERMIT_DEFAULT_DURATION_MS = 8 * 60 * 60 * 1000;
 

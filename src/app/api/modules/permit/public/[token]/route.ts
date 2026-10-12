@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { saveDataUrlUpload } from "@/lib/uploads";
-import { isHazardKey, isPpeKey } from "@/lib/modules/permit-options";
+import {
+  isHazardKey,
+  isPpeKey,
+  isPrecautionKey,
+  requiredPrecautions,
+} from "@/lib/modules/permit-options";
 
 export async function GET(
   _req: Request,
@@ -40,9 +45,9 @@ const submitSchema = z.object({
   hazards: z
     .array(z.string().refine(isHazardKey, "Unknown hazard"))
     .min(1, "Select at least one hazard."),
-  lotoConfirmed: z.literal(true, "Confirm energy isolation (LOTO)."),
-  barricadesConfirmed: z.literal(true, "Confirm barricades and warning signs."),
-  fireExtinguisherOk: z.literal(true, "Confirm the fire extinguisher is on standby."),
+  precautions: z
+    .array(z.string().refine(isPrecautionKey, "Unknown precaution"))
+    .min(1, "Tick the precautions that are in place."),
   ppe: z.array(z.string().refine(isPpeKey, "Unknown PPE item")).default([]),
   areaPhotoDataUrl: dataImage("Add a work area photo."),
   equipmentPhotoDataUrl: dataImage("Add a safety equipment photo."),
@@ -89,6 +94,15 @@ export async function POST(
         );
       }
       const body = submitSchema.parse(raw);
+      const missing = requiredPrecautions(body.hazards).find(
+        (p) => !body.precautions.includes(p.key),
+      );
+      if (missing) {
+        return NextResponse.json(
+          { error: `“${missing.label}” is required for the hazards selected.` },
+          { status: 400 },
+        );
+      }
       const areaPhotoUrl = await saveDataUrlUpload(body.areaPhotoDataUrl, folder);
       const equipmentPhotoUrl = await saveDataUrlUpload(body.equipmentPhotoDataUrl, folder);
       const preWorkReceiverSigUrl = await saveDataUrlUpload(body.receiverSignatureDataUrl, folder);
@@ -101,9 +115,10 @@ export async function POST(
           equipmentId: body.equipmentId,
           workDetails: body.workDetails,
           hazardsJson: JSON.stringify(body.hazards),
-          lotoConfirmed: true,
-          barricadesConfirmed: true,
-          fireExtinguisherOk: true,
+          precautionsJson: JSON.stringify(body.precautions),
+          lotoConfirmed: body.precautions.includes("loto"),
+          barricadesConfirmed: body.precautions.includes("barricades"),
+          fireExtinguisherOk: body.precautions.includes("extinguisher"),
           ppeJson: JSON.stringify(body.ppe),
           areaPhotoUrl,
           equipmentPhotoUrl,

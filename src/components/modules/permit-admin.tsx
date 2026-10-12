@@ -21,6 +21,7 @@ import {
   PERMIT_HAZARDS,
   PERMIT_MAX_DURATION_MS,
   PERMIT_PPE,
+  PERMIT_PRECAUTIONS,
   toDatetimeLocalValue,
 } from "@/lib/modules/permit-options";
 
@@ -39,6 +40,7 @@ type Item = {
   expiresAt?: string | null;
   hazardsJson?: string | null;
   ppeJson?: string | null;
+  precautionsJson?: string | null;
   completionNotes?: string | null;
   areaPhotoUrl?: string | null;
   equipmentPhotoUrl?: string | null;
@@ -285,6 +287,7 @@ export function PermitAdmin() {
               const publicUrl = `${appUrl}/p/permit/${i.publicToken}`;
               const hazards = labelKeys(parseJsonKeys(i.hazardsJson), PERMIT_HAZARDS);
               const ppe = labelKeys(parseJsonKeys(i.ppeJson), PERMIT_PPE);
+              const precautions = labelKeys(parseJsonKeys(i.precautionsJson), PERMIT_PRECAUTIONS);
               const isSigning = signing?.id === i.id;
               return (
                 <div key={i.id} className="space-y-2 rounded-md border p-3 text-sm">
@@ -343,6 +346,12 @@ export function PermitAdmin() {
                       <>
                         <dt>Hazards</dt>
                         <dd className="text-foreground">{hazards.join(", ")}</dd>
+                      </>
+                    )}
+                    {precautions.length > 0 && (
+                      <>
+                        <dt>Controls</dt>
+                        <dd className="text-foreground">{precautions.join(", ")}</dd>
                       </>
                     )}
                     {ppe.length > 0 && (

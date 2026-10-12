@@ -208,6 +208,8 @@ model WorkPermit {
   lotoConfirmed       Boolean @default(false)
   barricadesConfirmed Boolean @default(false)
   fireExtinguisherOk  Boolean @default(false)
+  /// JSON array of PERMIT_PRECAUTIONS keys (loto/barricades/extinguisher mirrored in the booleans above)
+  precautionsJson  String?
   /// JSON array of PERMIT_PPE keys
   ppeJson          String?
   areaPhotoUrl     String?

@@ -5,7 +5,12 @@ import { useParams } from "next/navigation";
 import { Button, Input, Label } from "@/components/modules/ui-bits";
 import { PhotoInput } from "@/components/modules/photo-input";
 import { SignaturePad } from "@/components/platform/signature-pad";
-import { PERMIT_HAZARDS, PERMIT_PPE } from "@/lib/modules/permit-options";
+import {
+  PERMIT_HAZARDS,
+  PERMIT_PPE,
+  PERMIT_PRECAUTIONS,
+  requiredPrecautions,
+} from "@/lib/modules/permit-options";
 
 type Meta = {
   title: string;
@@ -41,10 +46,12 @@ function CheckRow({
   checked,
   onChange,
   label,
+  required,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
   label: string;
+  required?: boolean;
 }) {
   return (
     <label className="flex items-start gap-3 py-1 text-sm">
@@ -54,7 +61,18 @@ function CheckRow({
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
       />
-      <span>{label}</span>
+      <span>
+        {label}
+        {required && (
+          <span
+            className={`ml-2 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
+              checked ? "bg-emerald-500/15 text-emerald-700" : "bg-amber-500/15 text-amber-700"
+            }`}
+          >
+            Required
+          </span>
+        )}
+      </span>
     </label>
   );
 }
@@ -65,15 +83,14 @@ export default function Page() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hazards, setHazards] = useState<string[]>([]);
   const [ppe, setPpe] = useState<string[]>([]);
+  const [precautions, setPrecautions] = useState<string[]>([]);
+  const required = requiredPrecautions(hazards);
   const [form, setForm] = useState({
     contractorName: "",
     contractorPhone: "",
     specificLocation: "",
     equipmentId: "",
     workDetails: "",
-    loto: false,
-    barricades: false,
-    extinguisher: false,
     area: "",
     equip: "",
     completion: "",
@@ -137,9 +154,9 @@ export default function Page() {
       if (!form.equipmentId.trim()) return setError("Enter the equipment tag / asset number.");
       if (form.workDetails.trim().length < 3) return setError("Describe the task.");
       if (hazards.length === 0) return setError("Select at least one hazard.");
-      if (!form.loto) return setError("Tick the energy isolation (LOTO) precaution.");
-      if (!form.barricades) return setError("Tick the barricades and warning signs precaution.");
-      if (!form.extinguisher) return setError("Tick the fire extinguisher precaution.");
+      if (precautions.length === 0) return setError("Tick the precautions that are in place.");
+      const missing = required.find((p) => !precautions.includes(p.key));
+      if (missing) return setError(`Required for the hazards selected: ${missing.label}.`);
       if (!form.area) return setError("Add a work area photo.");
       if (!form.equip) return setError("Add a safety equipment photo.");
       if (!signature) return setError("The receiver must sign before submitting.");
@@ -164,9 +181,7 @@ export default function Page() {
                 equipmentId: form.equipmentId,
                 workDetails: form.workDetails,
                 hazards,
-                lotoConfirmed: form.loto,
-                barricadesConfirmed: form.barricades,
-                fireExtinguisherOk: form.extinguisher,
+                precautions,
                 ppe,
                 areaPhotoDataUrl: form.area,
                 equipmentPhotoDataUrl: form.equip,
@@ -389,22 +404,20 @@ export default function Page() {
       </Section>
 
       <Section title="Precautions & risk controls">
-        <div className="rounded-md border px-3 py-2">
-          <CheckRow
-            label="Energy isolation: power, valves or physical locks engaged (LOTO)"
-            checked={form.loto}
-            onChange={(v) => setField("loto", v)}
-          />
-          <CheckRow
-            label="Area barricades and warning signs in place"
-            checked={form.barricades}
-            onChange={(v) => setField("barricades", v)}
-          />
-          <CheckRow
-            label="Fire extinguisher on standby"
-            checked={form.extinguisher}
-            onChange={(v) => setField("extinguisher", v)}
-          />
+        <p className="text-xs text-muted-foreground">
+          Tick every control that is in place. Items marked Required apply to the hazards you
+          selected above.
+        </p>
+        <div className="grid rounded-md border px-3 py-2 sm:grid-cols-2 sm:gap-x-4">
+          {PERMIT_PRECAUTIONS.map((p) => (
+            <CheckRow
+              key={p.key}
+              label={p.label}
+              required={required.includes(p)}
+              checked={precautions.includes(p.key)}
+              onChange={() => toggle(p.key, setPrecautions)}
+            />
+          ))}
         </div>
         <div className="space-y-2">
           <Label>Mandatory PPE</Label>
