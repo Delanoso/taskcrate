@@ -193,9 +193,23 @@ model WorkPermit {
   organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   title            String
   publicToken      String       @unique @default(cuid())
+  /// Permit Issuer: safety officer / manager authorizing the work
+  issuerName       String?
+  /// Permit Receiver: supervisor / contractor managing the tools
   contractorName   String?
   contractorPhone  String?
+  specificLocation String?
+  equipmentId      String?
   workDetails      String?
+  startAt          DateTime?
+  expiresAt        DateTime?
+  /// JSON array of PERMIT_HAZARDS keys
+  hazardsJson      String?
+  lotoConfirmed       Boolean @default(false)
+  barricadesConfirmed Boolean @default(false)
+  fireExtinguisherOk  Boolean @default(false)
+  /// JSON array of PERMIT_PPE keys
+  ppeJson          String?
   areaPhotoUrl     String?
   equipmentPhotoUrl String?
   completionPhotoUrl String?
@@ -203,6 +217,14 @@ model WorkPermit {
   status           String       @default("sent") // sent|submitted|approved|completed|closed
   managerNotes     String?
   documentNumber   String?
+  preWorkReceiverSigUrl    String?
+  preWorkIssuerSigUrl      String?
+  preWorkReceiverSignedAt  DateTime?
+  preWorkIssuerSignedAt    DateTime?
+  postWorkReceiverSigUrl   String?
+  postWorkIssuerSigUrl     String?
+  postWorkReceiverSignedAt DateTime?
+  postWorkIssuerSignedAt   DateTime?
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 }
