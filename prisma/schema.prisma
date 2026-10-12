@@ -166,6 +166,12 @@ model ToolboxTalk {
   weekLabel      String
   content        String
   mediaUrl       String?
+  /// Slug from the built-in talk library (src/data/toolbox-library)
+  librarySlug    String?
+  /// Uploaded PDF/image under /uploads/toolbox/<orgId>/, served via the public token
+  attachmentUrl  String?
+  attachmentName String?
+  attachmentType String?
   publicToken    String              @unique @default(cuid())
   status         String              @default("open")
   createdAt      DateTime            @default(now())

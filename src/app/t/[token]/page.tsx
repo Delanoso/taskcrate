@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { ToolboxPublicForm } from "@/components/platform/toolbox-public-form";
 import { db } from "@/lib/db";
+import { findLibraryTalk } from "@/data/toolbox-library";
 
 export default async function PublicToolboxTalkPage({
   params,
@@ -26,6 +27,10 @@ export default async function PublicToolboxTalkPage({
             content: talk.content,
             mediaUrl: talk.mediaUrl,
             companyName: talk.organization.branding?.displayName ?? talk.organization.name,
+            library: findLibraryTalk(talk.librarySlug) ?? null,
+            attachment: talk.attachmentUrl
+              ? { name: talk.attachmentName ?? "Attachment", type: talk.attachmentType ?? "" }
+              : null,
           }}
         />
       </div>

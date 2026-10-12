@@ -5,6 +5,8 @@ import { SignaturePad } from "@/components/platform/signature-pad";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TalkMaterial } from "@/components/toolbox/talk-material";
+import type { LibraryTalk } from "@/data/toolbox-library/types";
 
 type Talk = {
   title: string;
@@ -12,6 +14,8 @@ type Talk = {
   content: string;
   mediaUrl: string | null;
   companyName: string;
+  library: LibraryTalk | null;
+  attachment: { name: string; type: string } | null;
 };
 
 export function ToolboxPublicForm({ token, talk }: { token: string; talk: Talk }) {
@@ -66,19 +70,16 @@ export function ToolboxPublicForm({ token, talk }: { token: string; talk: Talk }
         <p className="text-sm text-muted-foreground">{talk.weekLabel}</p>
       </header>
 
-      <section className="rounded-xl border bg-card p-5 shadow-sm">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          This week&apos;s safety material
-        </h2>
-        <div className="mt-3 whitespace-pre-wrap text-sm leading-relaxed">{talk.content}</div>
-        {talk.mediaUrl && (
-          <p className="mt-4 text-sm">
-            <a href={talk.mediaUrl} target="_blank" rel="noreferrer" className="underline">
-              Open supporting media
-            </a>
-          </p>
-        )}
-      </section>
+      <TalkMaterial
+        library={talk.library}
+        content={talk.content}
+        mediaUrl={talk.mediaUrl}
+        attachment={
+          talk.attachment
+            ? { ...talk.attachment, href: `/api/toolbox/public/${token}/attachment` }
+            : null
+        }
+      />
 
       <form onSubmit={submit} className="space-y-4 rounded-xl border bg-card p-5 shadow-sm">
         <h2 className="font-medium">Confirm attendance</h2>
