@@ -14,6 +14,15 @@ const nextConfig: NextConfig = {
     "*.ngrok-free.app",
     "*.ngrok.io",
   ],
+  // beforeFiles: every upload goes through the tenant check, even files that
+  // happened to exist in /public at build time.
+  async rewrites() {
+    return {
+      beforeFiles: [{ source: "/uploads/:path*", destination: "/api/uploads/:path*" }],
+      afterFiles: [],
+      fallback: [],
+    };
+  },
   turbopack: {
     rules: {
       "*.css": {
