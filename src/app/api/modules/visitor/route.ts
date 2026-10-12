@@ -20,9 +20,14 @@ export async function GET() {
       include: { visitors: true },
     });
   }
+  const onSite = await db.visitorCheckIn.findMany({
+    where: { siteId: site.id, checkedOutAt: null },
+    orderBy: { createdAt: "asc" },
+  });
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3847";
   return NextResponse.json({
     site,
+    onSite,
     publicUrl: `${appUrl}/p/visitor/${site.publicToken}`,
   });
 }

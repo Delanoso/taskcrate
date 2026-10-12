@@ -260,6 +260,14 @@ model VisitorCheckIn {
   whatsappSent  Boolean     @default(true)
   deliveryLog   String?
   createdAt     DateTime    @default(now())
+  /// Per-visit link sent on WhatsApp so the visitor can check themselves out
+  checkoutToken String?     @default(cuid())
+  checkedOutAt  DateTime?
+  /// "Visitor" for self check-out, otherwise the staff member's name
+  checkedOutBy  String?
+
+  @@index([checkoutToken])
+  @@index([siteId, checkedOutAt])
 }
 
 // ——— Asset Pre-Check ———
