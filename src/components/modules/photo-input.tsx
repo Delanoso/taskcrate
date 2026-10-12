@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { fileToCompressedDataUrl } from "@/lib/image-compress";
 
@@ -16,6 +16,12 @@ export function PhotoInput({
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Compression is async; call the latest onChange so callers spreading form state
+  // don't overwrite fields edited while the photo was processing.
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
 
   return (
     <div className="space-y-2">
@@ -39,11 +45,11 @@ export function PhotoInput({
           try {
             const dataUrl = await fileToCompressedDataUrl(file);
             setPreview(dataUrl);
-            onChange(dataUrl);
+            onChangeRef.current(dataUrl);
           } catch {
             setPreview(null);
             setError("Could not read that photo. Try again.");
-            onChange(null);
+            onChangeRef.current(null);
           } finally {
             setBusy(false);
           }

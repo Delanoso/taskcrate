@@ -84,6 +84,12 @@ export default function Page() {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState("");
 
+  // Functional updates: photo inputs resolve after async compression and must not
+  // overwrite fields changed in the meantime.
+  function setField<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
+    setForm((f) => ({ ...f, [key]: value }));
+  }
+
   async function refresh() {
     const res = await fetch(`/api/modules/permit/public/${token}`);
     const text = await res.text();
@@ -118,8 +124,8 @@ export default function Page() {
     return () => window.clearInterval(id);
   }, [meta?.status, token]);
 
-  function toggle(list: string[], key: string, set: (v: string[]) => void) {
-    set(list.includes(key) ? list.filter((k) => k !== key) : [...list, key]);
+  function toggle(key: string, set: React.Dispatch<React.SetStateAction<string[]>>) {
+    set((list) => (list.includes(key) ? list.filter((k) => k !== key) : [...list, key]));
   }
 
   async function submit(action: "submit" | "complete") {
@@ -131,9 +137,9 @@ export default function Page() {
       if (!form.equipmentId.trim()) return setError("Enter the equipment tag / asset number.");
       if (form.workDetails.trim().length < 3) return setError("Describe the task.");
       if (hazards.length === 0) return setError("Select at least one hazard.");
-      if (!form.loto || !form.barricades || !form.extinguisher) {
-        return setError("Confirm all three precautions before submitting.");
-      }
+      if (!form.loto) return setError("Tick the energy isolation (LOTO) precaution.");
+      if (!form.barricades) return setError("Tick the barricades and warning signs precaution.");
+      if (!form.extinguisher) return setError("Tick the fire extinguisher precaution.");
       if (!form.area) return setError("Add a work area photo.");
       if (!form.equip) return setError("Add a safety equipment photo.");
       if (!signature) return setError("The receiver must sign before submitting.");
@@ -275,7 +281,7 @@ export default function Page() {
         <Section title="Post-work close-out">
           <PhotoInput
             label="Completion photo"
-            onChange={(u) => setForm({ ...form, completion: u ?? "" })}
+            onChange={(u) => setField("completion", u ?? "")}
           />
           <div className="space-y-2">
             <Label>Close-out notes</Label>
@@ -283,7 +289,7 @@ export default function Page() {
               className="min-h-20 w-full rounded-md border bg-background p-2 text-sm"
               placeholder="What was finished, and anything the issuer should know"
               value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              onChange={(e) => setField("notes", e.target.value)}
             />
           </div>
           <div className="space-y-2">
@@ -325,7 +331,7 @@ export default function Page() {
           <Input
             placeholder="Supervisor / contractor managing the tools"
             value={form.contractorName}
-            onChange={(e) => setForm({ ...form, contractorName: e.target.value })}
+            onChange={(e) => setField("contractorName", e.target.value)}
           />
         </div>
         <div className="space-y-2">
@@ -335,7 +341,7 @@ export default function Page() {
             inputMode="tel"
             placeholder="Mobile number"
             value={form.contractorPhone}
-            onChange={(e) => setForm({ ...form, contractorPhone: e.target.value })}
+            onChange={(e) => setField("contractorPhone", e.target.value)}
           />
         </div>
       </Section>
@@ -346,7 +352,7 @@ export default function Page() {
           <Input
             placeholder="e.g. Warehouse B, Grid Line 4"
             value={form.specificLocation}
-            onChange={(e) => setForm({ ...form, specificLocation: e.target.value })}
+            onChange={(e) => setField("specificLocation", e.target.value)}
           />
         </div>
         <div className="space-y-2">
@@ -354,7 +360,7 @@ export default function Page() {
           <Input
             placeholder="Equipment tag, asset number or machine name"
             value={form.equipmentId}
-            onChange={(e) => setForm({ ...form, equipmentId: e.target.value })}
+            onChange={(e) => setField("equipmentId", e.target.value)}
           />
         </div>
         <div className="space-y-2">
@@ -363,19 +369,20 @@ export default function Page() {
             className="min-h-20 w-full rounded-md border bg-background p-2 text-sm"
             placeholder="e.g. Replacing overhead motor belts"
             value={form.workDetails}
-            onChange={(e) => setForm({ ...form, workDetails: e.target.value })}
+            onChange={(e) => setField("workDetails", e.target.value)}
           />
         </div>
       </Section>
 
       <Section title="Hazard identification">
-        <div className="rounded-md border px-3 py-2">
+        <p className="text-xs text-muted-foreground">Tick every hazard present at this job.</p>
+        <div className="grid rounded-md border px-3 py-2 sm:grid-cols-2 sm:gap-x-4">
           {PERMIT_HAZARDS.map((h) => (
             <CheckRow
               key={h.key}
               label={h.label}
               checked={hazards.includes(h.key)}
-              onChange={() => toggle(hazards, h.key, setHazards)}
+              onChange={() => toggle(h.key, setHazards)}
             />
           ))}
         </div>
@@ -386,28 +393,28 @@ export default function Page() {
           <CheckRow
             label="Energy isolation: power, valves or physical locks engaged (LOTO)"
             checked={form.loto}
-            onChange={(v) => setForm({ ...form, loto: v })}
+            onChange={(v) => setField("loto", v)}
           />
           <CheckRow
             label="Area barricades and warning signs in place"
             checked={form.barricades}
-            onChange={(v) => setForm({ ...form, barricades: v })}
+            onChange={(v) => setField("barricades", v)}
           />
           <CheckRow
             label="Fire extinguisher on standby"
             checked={form.extinguisher}
-            onChange={(v) => setForm({ ...form, extinguisher: v })}
+            onChange={(v) => setField("extinguisher", v)}
           />
         </div>
         <div className="space-y-2">
-          <Label>Mandatory PPE (beyond standard footwear)</Label>
-          <div className="rounded-md border px-3 py-2">
+          <Label>Mandatory PPE</Label>
+          <div className="grid rounded-md border px-3 py-2 sm:grid-cols-2 sm:gap-x-4">
             {PERMIT_PPE.map((p) => (
               <CheckRow
                 key={p.key}
                 label={p.label}
                 checked={ppe.includes(p.key)}
-                onChange={() => toggle(ppe, p.key, setPpe)}
+                onChange={() => toggle(p.key, setPpe)}
               />
             ))}
           </div>
@@ -415,10 +422,10 @@ export default function Page() {
       </Section>
 
       <Section title="Photo evidence">
-        <PhotoInput label="Work area photo" onChange={(u) => setForm({ ...form, area: u ?? "" })} />
+        <PhotoInput label="Work area photo" onChange={(u) => setField("area", u ?? "")} />
         <PhotoInput
           label="Safety equipment photo"
-          onChange={(u) => setForm({ ...form, equip: u ?? "" })}
+          onChange={(u) => setField("equip", u ?? "")}
         />
       </Section>
 

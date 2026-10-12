@@ -154,24 +154,28 @@ export async function buildPermitClosedPdf(permit: PermitForPdf) {
     y -= 2;
   }
 
-  function checklist(items: { label: string; on: boolean }[]) {
-    for (const item of items) {
+  function checklist(items: { label: string; on: boolean }[], columns = 1) {
+    const colW = (PAGE_W - MARGIN * 2) / columns;
+    for (let i = 0; i < items.length; i += columns) {
       ensure(15);
-      page.drawRectangle({
-        x: MARGIN,
-        y: y - 2,
-        width: 9,
-        height: 9,
-        borderColor: rgb(0.4, 0.4, 0.4),
-        borderWidth: 0.7,
-        color: item.on ? primaryRgb : undefined,
-      });
-      page.drawText(safe(item.label), {
-        x: MARGIN + 16,
-        y,
-        size: 10,
-        font,
-        color: item.on ? ink : muted,
+      items.slice(i, i + columns).forEach((item, c) => {
+        const x = MARGIN + c * colW;
+        page.drawRectangle({
+          x,
+          y: y - 2,
+          width: 9,
+          height: 9,
+          borderColor: rgb(0.4, 0.4, 0.4),
+          borderWidth: 0.7,
+          color: item.on ? primaryRgb : undefined,
+        });
+        page.drawText(fit(safe(item.label), font, 9, colW - 22), {
+          x: x + 16,
+          y,
+          size: 9,
+          font,
+          color: item.on ? ink : muted,
+        });
       });
       y -= 15;
     }
@@ -268,7 +272,10 @@ export async function buildPermitClosedPdf(permit: PermitForPdf) {
 
   heading("3. Hazard identification");
   const hazards = new Set(parseJsonKeys(permit.hazardsJson));
-  checklist(PERMIT_HAZARDS.map((h) => ({ label: h.label, on: hazards.has(h.key) })));
+  checklist(
+    PERMIT_HAZARDS.map((h) => ({ label: h.label, on: hazards.has(h.key) })),
+    2,
+  );
 
   heading("4. Precautions & risk controls");
   checklist([
@@ -277,7 +284,7 @@ export async function buildPermitClosedPdf(permit: PermitForPdf) {
     { label: "Fire extinguisher on standby", on: !!permit.fireExtinguisherOk },
   ]);
   const ppe = parseJsonKeys(permit.ppeJson);
-  field("Mandatory PPE", ppe.length ? labelKeys(ppe, PERMIT_PPE).join(", ") : "None beyond standard");
+  field("Mandatory PPE", ppe.length ? labelKeys(ppe, PERMIT_PPE).join(", ") : "None selected");
 
   heading("5. Photo evidence");
   await imageRow(
