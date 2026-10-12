@@ -1,5 +1,8 @@
+import { rm } from "fs/promises";
+import path from "path";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { OrgRole } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { requireProductApi } from "@/lib/modules/api-guard";
 import { buildPermitClosedPdf, nextPermitDocumentNumber } from "@/lib/modules/permit-pdf";
@@ -83,6 +86,47 @@ export async function POST(req: Request) {
     item,
     publicUrl: `${appUrl}/p/permit/${item.publicToken}`,
   });
+}
+
+export async function DELETE(req: Request) {
+  const gate = await requireProductApi("permit-to-work");
+  if ("error" in gate) return gate.error;
+  if (gate.access.role === OrgRole.MEMBER) {
+    return NextResponse.json(
+      { error: "Only owners, admins and managers can delete permits." },
+      { status: 403 },
+    );
+  }
+  const id = new URL(req.url).searchParams.get("id");
+  if (!id) return NextResponse.json({ error: "Missing permit id" }, { status: 400 });
+
+  const existing = await db.workPermit.findFirst({
+    where: { id, organizationId: gate.session.organizationId },
+  });
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  await db.workPermit.delete({ where: { id: existing.id } });
+
+  const uploadRoot = path.join(process.cwd(), "public", "uploads");
+  const files = [
+    existing.areaPhotoUrl,
+    existing.equipmentPhotoUrl,
+    existing.completionPhotoUrl,
+    existing.preWorkReceiverSigUrl,
+    existing.preWorkIssuerSigUrl,
+    existing.postWorkReceiverSigUrl,
+    existing.postWorkIssuerSigUrl,
+  ];
+  await Promise.all(
+    files
+      .filter((u): u is string => !!u?.startsWith(`/uploads/permits/${existing.organizationId}/`))
+      .map((u) => {
+        const filePath = path.join(process.cwd(), "public", u);
+        return filePath.startsWith(uploadRoot + path.sep) ? rm(filePath, { force: true }) : null;
+      }),
+  );
+
+  return NextResponse.json({ ok: true });
 }
 
 const patchSchema = z.object({

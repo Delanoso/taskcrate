@@ -97,6 +97,7 @@ export function PermitAdmin() {
   const [signing, setSigning] = useState<SignMode | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const appUrl = typeof window !== "undefined" ? window.location.origin : "";
 
   const load = useCallback(async () => {
@@ -149,6 +150,23 @@ export function PermitAdmin() {
     setSignature(null);
     setNotes("");
     setError(null);
+  }
+
+  async function remove(item: Item) {
+    setBusyId(item.id);
+    setError(null);
+    setMessage(null);
+    try {
+      await jsonFetch(`/api/modules/permit?id=${encodeURIComponent(item.id)}`, { method: "DELETE" });
+      setConfirmDeleteId(null);
+      if (signing?.id === item.id) setSigning(null);
+      setMessage(`Deleted ${item.documentNumber ?? "permit"} “${item.title}”.`);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setBusyId(null);
+    }
   }
 
   async function confirmSigning() {
@@ -376,7 +394,36 @@ export function PermitAdmin() {
                   </div>
                   <LinkBox url={publicUrl} />
 
-                  {isSigning ? (
+                  {confirmDeleteId === i.id ? (
+                    <div className="space-y-2 rounded-md border border-destructive/40 bg-destructive/5 p-3">
+                      <p className="font-medium">
+                        Delete {i.documentNumber ?? "this permit"}?
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {i.status === "closed"
+                          ? "This permit is closed and filed. Deleting it permanently removes the compliance record, photos and signatures. Download the PDF first if you need to keep it."
+                          : "The permit, its photos and signatures are permanently removed and the contractor link stops working."}
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={busyId === i.id}
+                          onClick={() => remove(i)}
+                        >
+                          {busyId === i.id ? "Deleting…" : "Yes, delete"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busyId === i.id}
+                          onClick={() => setConfirmDeleteId(null)}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : isSigning ? (
                     <div className="space-y-2 rounded-md border bg-muted/40 p-3">
                       <p className="font-medium">
                         {signing.status === "approved"
@@ -452,6 +499,17 @@ export function PermitAdmin() {
                         >
                           WhatsApp
                         </a>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="ml-auto text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => {
+                          setSigning(null);
+                          setConfirmDeleteId(i.id);
+                        }}
+                      >
+                        Delete
                       </Button>
                     </div>
                   )}
