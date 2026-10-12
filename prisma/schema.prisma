@@ -1,0 +1,570 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships      Membership[]
+  termsAcceptances TermsAcceptance[]
+  notifications    Notification[]
+  ipNoticeAcks     IpNoticeAcknowledgement[]
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  branding       OrganizationBranding?
+  departments    Department[]
+  memberships    Membership[]
+  subscriptions  Subscription[]
+  documents      DocumentSequence[]
+  notifications  Notification[]
+  toolboxTalks   ToolboxTalk[]
+  permits        WorkPermit[]
+  visitorSites   VisitorSite[]
+  assets         Asset[]
+  nearMisses     NearMissReport[]
+  nearMissBoard  NearMissBoard?
+  contractors    ContractorProfile[]
+  ohsaAudits     OhsaAudit[]
+  leaveRequests  LeaveRequest[]
+  leaveRules     LeaveLevelRule[]
+  disciplineLogs DisciplineEntry[]
+  onboardings    OnboardingPacket[]
+  contracts      ContractDocument[]
+  equipmentItems EquipmentItem[]
+  equipmentLogs  EquipmentCustodyLog[]
+  loanRecords    LoanDeductibleRecord[]
+  jobCards       JobCard[]
+  stockItems     StockItem[]
+  vehicles       Vehicle[]
+  meterSites     MeterSite[]
+  obSites        ObSite[]
+  fitSites       FitForDutySite[]
+}
+
+model OrganizationBranding {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  displayName    String
+  logoUrl        String?
+  primaryColor   String       @default("#1e3a5f")
+  accentColor    String       @default("#0ea5e9")
+}
+
+model Department {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  memberships    Membership[]
+
+  @@unique([organizationId, name])
+}
+
+enum OrgRole {
+  OWNER
+  ADMIN
+  MANAGER
+  MEMBER
+}
+
+model Membership {
+  id             String       @id @default(cuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role           OrgRole      @default(MEMBER)
+  departmentId   String?
+  department     Department?  @relation(fields: [departmentId], references: [id])
+  productAccess  String?
+  createdAt      DateTime     @default(now())
+
+  @@unique([userId, organizationId])
+}
+
+model TermsAcceptance {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  version    String
+  acceptedAt DateTime @default(now())
+}
+
+model Subscription {
+  id                   String       @id @default(cuid())
+  organizationId       String
+  organization         Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  productSlug          String
+  status               String       @default("active")
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  @@unique([organizationId, productSlug])
+}
+
+model DocumentSequence {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  prefix         String       @default("DOC")
+  nextNumber     Int          @default(1)
+
+  @@unique([organizationId, prefix])
+}
+
+model Notification {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String?
+  user           User?        @relation(fields: [userId], references: [id])
+  productSlug    String
+  title          String
+  body           String
+  dueAt          DateTime?
+  readAt         DateTime?
+  createdAt      DateTime     @default(now())
+}
+
+model IpNoticeAcknowledgement {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productSlug    String
+  version        String
+  acknowledgedAt DateTime @default(now())
+
+  @@unique([userId, productSlug, version])
+}
+
+// ——— Toolbox Talks ———
+model ToolboxTalk {
+  id             String              @id @default(cuid())
+  organizationId String
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  title          String
+  weekLabel      String
+  content        String
+  mediaUrl       String?
+  publicToken    String              @unique @default(cuid())
+  status         String              @default("open")
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  attendances    ToolboxAttendance[]
+}
+
+model ToolboxAttendance {
+  id            String      @id @default(cuid())
+  talkId        String
+  talk          ToolboxTalk @relation(fields: [talkId], references: [id], onDelete: Cascade)
+  firstName     String
+  lastName      String
+  signatureData String
+  signedAt      DateTime    @default(now())
+  ipHash        String?
+
+  @@index([talkId])
+}
+
+// ——— Permit to Work ———
+model WorkPermit {
+  id               String       @id @default(cuid())
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  title            String
+  publicToken      String       @unique @default(cuid())
+  contractorName   String?
+  contractorPhone  String?
+  workDetails      String?
+  areaPhotoUrl     String?
+  equipmentPhotoUrl String?
+  completionPhotoUrl String?
+  completionNotes  String?
+  status           String       @default("sent") // sent|submitted|approved|completed|closed
+  managerNotes     String?
+  documentNumber   String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+// ——— Site Visitor ———
+model VisitorSite {
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  publicToken    String           @unique @default(cuid())
+  protocolText   String
+  createdAt      DateTime         @default(now())
+  visitors       VisitorCheckIn[]
+}
+
+model VisitorCheckIn {
+  id            String      @id @default(cuid())
+  siteId        String
+  site          VisitorSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  fullName      String
+  registration  String?
+  purpose       String
+  phone         String
+  whatsappSent  Boolean     @default(true)
+  deliveryLog   String?
+  createdAt     DateTime    @default(now())
+}
+
+// ——— Asset Pre-Check ———
+model Asset {
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  assetCode      String
+  publicToken    String           @unique @default(cuid())
+  checklistJson  String           // JSON array of 5 checkpoint labels
+  createdAt      DateTime         @default(now())
+  checks         AssetPreCheck[]
+
+  @@unique([organizationId, assetCode])
+}
+
+model AssetPreCheck {
+  id            String   @id @default(cuid())
+  assetId       String
+  asset         Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  operatorName  String
+  answersJson   String
+  passToken     String   @unique @default(cuid())
+  shiftDate     DateTime @default(now())
+  createdAt     DateTime @default(now())
+}
+
+// ——— Near Miss ———
+model NearMissBoard {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  publicToken    String       @unique @default(cuid())
+}
+
+model NearMissReport {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  description    String
+  photoUrl       String?
+  locationHint   String?
+  status         String       @default("open") // open|triaged|closed
+  createdAt      DateTime     @default(now())
+}
+
+// ——— Contractor Safety File ———
+model ContractorProfile {
+  id             String              @id @default(cuid())
+  organizationId String
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  companyName    String
+  contactEmail   String?
+  contactPhone   String?
+  publicToken    String              @unique @default(cuid())
+  status         String              @default("pending") // pending|active|blocked
+  createdAt      DateTime            @default(now())
+  documents      ContractorDocument[]
+}
+
+model ContractorDocument {
+  id           String            @id @default(cuid())
+  contractorId String
+  contractor   ContractorProfile @relation(fields: [contractorId], references: [id], onDelete: Cascade)
+  docType      String // coida|liability|medical
+  fileUrl      String
+  expiresAt    DateTime?
+  uploadedAt   DateTime          @default(now())
+}
+
+// ——— OHSA Mock Auditor ———
+model OhsaAudit {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  title          String
+  monthLabel     String
+  answersJson    String       @default("[]")
+  score          Float?
+  status         String       @default("in_progress")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+// ——— Leave Planner ———
+model LeaveLevelRule {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  levelName      String
+  mode           String       // approve|auto|block
+  blackoutJson   String       @default("[]") // ISO date strings
+
+  @@unique([organizationId, levelName])
+}
+
+model LeaveRequest {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  publicToken    String       @unique @default(cuid())
+  employeeName   String
+  employeeLevel  String
+  startDate      DateTime
+  endDate        DateTime
+  reason         String?
+  status         String       @default("pending") // pending|approved|auto_approved|blocked|rejected
+  createdAt      DateTime     @default(now())
+}
+
+// ——— Discipline ———
+model DisciplineEntry {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employeeName   String
+  stage          String // verbal|written|final|dismissal
+  notes          String
+  photoUrl       String?
+  incidentAt     DateTime
+  createdAt      DateTime     @default(now())
+}
+
+// ——— Onboard Docs ———
+model OnboardingPacket {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employeeName   String
+  employeePhone  String?
+  publicToken    String       @unique @default(cuid())
+  idDocUrl       String?
+  addressDocUrl  String?
+  bankJson       String? // encrypted-at-rest placeholder JSON
+  status         String       @default("sent")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+// ——— Contract Sentinel ———
+model ContractDocument {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  title          String
+  bodyText       String
+  publicToken    String       @unique @default(cuid())
+  employeeName   String?
+  employeeContact String?
+  signatureData  String?
+  status         String       @default("sent")
+  signedAt       DateTime?
+  createdAt      DateTime     @default(now())
+}
+
+// ——— Equipment ———
+model EquipmentItem {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  assetTag       String?
+  status         String       @default("available") // available|issued
+  createdAt      DateTime     @default(now())
+}
+
+model EquipmentCustodyLog {
+  id             String        @id @default(cuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  itemId         String
+  employeeName   String
+  action         String // issue|handback
+  signatureData  String?
+  conditionNotes String?
+  damagePhotoUrl String?
+  createdAt      DateTime      @default(now())
+}
+
+// ——— Loan / Deductible ———
+model LoanDeductibleRecord {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  publicToken    String       @unique @default(cuid())
+  employeeName   String
+  recordType     String // loan|deductible
+  amount         Float
+  description    String
+  photoUrl       String?
+  signatureData  String?
+  status         String       @default("pending")
+  signedAt       DateTime?
+  createdAt      DateTime     @default(now())
+}
+
+// ——— Job Cards ———
+model JobCard {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  mode           String // internal|field
+  title          String
+  machineRef     String?
+  publicToken    String       @unique @default(cuid())
+  description    String?
+  status         String       @default("open") // open|scheduled|in_progress|done
+  mechanicName   String?
+  downtimeHours  Float?
+  partsCost      Float?
+  partsJson      String? // [{name,qty,cost}]
+  hoursWorked    Float?
+  clientName     String?
+  clientSignature String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+// ——— Workshop Stock ———
+model StockItem {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  sku            String?
+  quantity       Int          @default(0)
+  reorderAt      Int          @default(5)
+  publicToken    String       @unique @default(cuid())
+  createdAt      DateTime     @default(now())
+  movements      StockMovement[]
+}
+
+model StockMovement {
+  id        String    @id @default(cuid())
+  itemId    String
+  item      StockItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  delta     Int
+  note      String?
+  createdAt DateTime  @default(now())
+}
+
+// ——— Pre-Trip / Handover ———
+model Vehicle {
+  id             String            @id @default(cuid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  regNumber      String
+  publicToken    String            @unique @default(cuid())
+  createdAt      DateTime          @default(now())
+  trips          VehicleTripLog[]
+}
+
+model VehicleTripLog {
+  id              String   @id @default(cuid())
+  vehicleId       String
+  vehicle         Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  driverName      String
+  startKm         Int
+  endKm           Int?
+  checklistJson   String
+  photoUrlsJson   String? // up to 4 panel photos
+  handoverFrom    String?
+  handoverTo      String?
+  varianceFlag    Boolean  @default(false)
+  createdAt       DateTime @default(now())
+}
+
+// ——— Meter Variance ———
+model MeterSite {
+  id             String         @id @default(cuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  meterType      String // water|electricity
+  alertThreshold Float          @default(1.5) // multiplier vs baseline
+  alertPhone     String?
+  createdAt      DateTime       @default(now())
+  readings       MeterReading[]
+}
+
+model MeterReading {
+  id        String    @id @default(cuid())
+  siteId    String
+  site      MeterSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  reading   Float
+  occupancy Int       @default(0)
+  alerted   Boolean   @default(false)
+  createdAt DateTime  @default(now())
+}
+
+// ——— Digital OB ———
+model ObSite {
+  id             String    @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  publicToken    String    @unique @default(cuid())
+  wakeMinutes    Int       @default(60)
+  guardPhone     String?
+  controlPhone   String?
+  createdAt      DateTime  @default(now())
+  entries        ObEntry[]
+}
+
+model ObEntry {
+  id        String   @id @default(cuid())
+  siteId    String
+  site      ObSite   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  category  String
+  notes     String?
+  lat       Float?
+  lng       Float?
+  createdAt DateTime @default(now())
+}
+
+// ——— Fit for Duty ———
+model FitForDutySite {
+  id             String              @id @default(cuid())
+  organizationId String
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  publicToken    String              @unique @default(cuid())
+  createdAt      DateTime            @default(now())
+  checks         FitForDutyCheck[]
+}
+
+model FitForDutyCheck {
+  id            String         @id @default(cuid())
+  siteId        String
+  site          FitForDutySite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  employeeName  String
+  reactionMs    Int
+  ppeConfirmed  Boolean
+  status        String // VERIFIED_READY|FAILED|SKIPPED
+  createdAt     DateTime       @default(now())
+}
