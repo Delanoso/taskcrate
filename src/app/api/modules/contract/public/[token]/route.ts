@@ -1,77 +1,79 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { db } from "@/lib/db";
+import { companyName, notFound, parseBody, saDateKey } from "@/lib/modules/common";
+import { saveDataUrlUpload } from "@/lib/uploads";
+import { parseBlocks } from "@/lib/modules/contract-library";
+import { FOLDER, OPEN, SLUG, clientIp, normStatus, storeSignedPdf } from "@/lib/modules/contract-server";
 
-export async function GET(_req: Request, { params }: { params: Promise<{ token: string }> }) {
-  const { token } = await params;
-  const item = await db.contractDocument.findUnique({
-    where: { publicToken: token },
-    include: { organization: { include: { branding: true } } },
-  });
-  if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
+const find = (token: string) => (token.length < 10 ? null : db.contractDocument.findUnique({ where: { publicToken: token } }));
+
+export async function GET(req: Request, { params }: { params: Promise<{ token: string }> }) {
+  let d = await find((await params).token);
+  if (!d) return notFound();
+  if (d.status === "sent") {
+    d = await db.contractDocument.update({ where: { id: d.id }, data: { status: "viewed", viewedAt: new Date(), viewIp: clientIp(req) } });
+  }
+  const status = normStatus(d.status);
   return NextResponse.json({
-    contract: {
-      title: item.title,
-      bodyText: item.bodyText,
-      status: item.status,
-      companyName: item.organization.branding?.displayName ?? item.organization.name,
-    },
+    company: await companyName(d.organizationId),
+    reference: d.reference,
+    title: d.title,
+    kind: d.kind,
+    blocks: d.kind === "text" && status !== "voided" ? parseBlocks(d.bodyText) : [],
+    pageCount: d.pageCount,
+    contentHash: d.contentHash,
+    status,
+    employeeName: d.employeeName,
+    dueDate: d.dueDate ? saDateKey(d.dueDate) : null,
+    signedAt: d.signedAt?.toISOString() ?? null,
+    signerName: d.signerName ?? (d.signedAt ? d.employeeName : null),
+    requireCountersign: d.requireCountersign,
+    countersignedAt: d.countersignedAt?.toISOString() ?? null,
+    declinedAt: d.declinedAt?.toISOString() ?? null,
   });
 }
 
-export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
-  const { token } = await params;
-  const item = await db.contractDocument.findUnique({
-    where: { publicToken: token },
-    include: { organization: { include: { branding: true } } },
-  });
-  if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const body = z.object({
-    employeeName: z.string().min(2),
-    signatureData: z.string().startsWith("data:image/"),
-  }).parse(await req.json());
+const signInput = z.object({
+  signerName: z.string().trim().min(3, "Type your full name").max(120),
+  idNumber: z.string().trim().max(30).nullable().optional(),
+  agree: z.literal(true, { error: "Tick the box to confirm you have read and agree to the document" }),
+  signature: z.string().regex(/^data:image\/png;base64,/, "Please sign in the box").max(1_500_000),
+});
 
-  await db.contractDocument.update({
-    where: { id: item.id },
+export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
+  const d = await find((await params).token);
+  if (!d) return notFound();
+  const status = normStatus(d.status);
+  if (!OPEN.includes(status)) {
+    const msg = status === "voided" ? "This document has been withdrawn." : status === "declined" ? "You declined this document." : "This document has already been signed.";
+    return NextResponse.json({ error: msg }, { status: 409 });
+  }
+  const body = await parseBody(req, signInput);
+  if ("error" in body) return body.error;
+  const url = await saveDataUrlUpload(body.data.signature, `${FOLDER}/${d.organizationId}`);
+  const now = new Date();
+  const updated = await db.contractDocument.update({
+    where: { id: d.id },
     data: {
-      employeeName: body.employeeName,
-      signatureData: body.signatureData,
-      status: "signed",
-      signedAt: new Date(),
+      status: d.requireCountersign ? "awaiting_countersign" : "completed",
+      signerName: body.data.signerName,
+      signerIdNumber: body.data.idNumber || null,
+      signatureUrl: url,
+      signedAt: now,
+      signIp: clientIp(req),
+      signUserAgent: req.headers.get("user-agent")?.slice(0, 300) ?? null,
+      viewedAt: d.viewedAt ?? now,
     },
   });
-
-  // Build multi-page PDF and stamp signature on every page footer block
-  const pdf = await PDFDocument.create();
-  const font = await pdf.embedFont(StandardFonts.Helvetica);
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const paragraphs = item.bodyText.split(/\n+/);
-  const pagesNeeded = Math.max(2, Math.ceil(paragraphs.length / 20));
-  const sigBytes = Buffer.from(body.signatureData.replace(/^data:image\/\w+;base64,/, ""), "base64");
-  const png = await pdf.embedPng(sigBytes).catch(() => null);
-  const company = item.organization.branding?.displayName ?? item.organization.name;
-
-  for (let i = 0; i < pagesNeeded; i++) {
-    const page = pdf.addPage([595, 842]);
-    const { height, width } = page.getSize();
-    page.drawText(item.title, { x: 48, y: height - 50, size: 14, font: bold });
-    page.drawText(`${company} · page ${i + 1}/${pagesNeeded}`, { x: 48, y: height - 68, size: 9, font, color: rgb(0.4,0.4,0.4) });
-    let y = height - 100;
-    const slice = paragraphs.slice(i * 20, i * 20 + 20);
-    for (const line of slice) {
-      page.drawText(line.slice(0, 95), { x: 48, y, size: 10, font });
-      y -= 16;
-    }
-    page.drawText("Employee signature block", { x: 48, y: 90, size: 9, font });
-    if (png) page.drawImage(png, { x: 48, y: 40, width: 120, height: 36 });
-    page.drawText(body.employeeName, { x: 180, y: 50, size: 10, font });
-    page.drawText(new Date().toLocaleDateString(), { x: width - 140, y: 40, size: 9, font });
-  }
-
-  const bytes = await pdf.save();
-  return NextResponse.json({
-    ok: true,
-    pdfBase64: Buffer.from(bytes).toString("base64"),
+  await storeSignedPdf(updated);
+  await db.notification.create({
+    data: {
+      organizationId: d.organizationId,
+      productSlug: SLUG,
+      title: `${body.data.signerName} signed ${d.title}`,
+      body: d.requireCountersign ? `${d.reference ?? ""} needs your countersignature.`.trim() : `${d.reference ?? ""} is complete. The signed PDF is ready.`.trim(),
+    },
   });
+  return NextResponse.json({ ok: true });
 }

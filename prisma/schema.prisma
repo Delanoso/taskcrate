@@ -50,6 +50,7 @@ model Organization {
   disciplineSettings DisciplineSettings?
   onboardings    OnboardingPacket[]
   contracts      ContractDocument[]
+  contractTemplates ContractTemplate[]
   equipmentItems EquipmentItem[]
   equipmentLogs  EquipmentCustodyLog[]
   loanRecords    LoanDeductibleRecord[]
@@ -612,19 +613,83 @@ model OnboardingDocument {
 }
 
 // ——— Contract Sentinel ———
+model ContractTemplate {
+  id                 String             @id @default(cuid())
+  organizationId     String
+  organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name               String
+  /// contract|policy|other
+  category           String             @default("contract")
+  /// text (bodyText with {{merge}} fields) | pdf (uploaded fileUrl)
+  kind               String             @default("text")
+  bodyText           String             @default("")
+  fileUrl            String?
+  fileName           String?
+  pageCount          Int?
+  requireCountersign Boolean            @default(false)
+  /// Days the employee has to sign; null = no due date
+  dueDays            Int?
+  archived           Boolean            @default(false)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  documents          ContractDocument[]
+
+  @@index([organizationId])
+}
+
 model ContractDocument {
-  id             String       @id @default(cuid())
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  title          String
-  bodyText       String
-  publicToken    String       @unique @default(cuid())
-  employeeName   String?
-  employeeContact String?
-  signatureData  String?
-  status         String       @default("sent")
-  signedAt       DateTime?
-  createdAt      DateTime     @default(now())
+  id                 String            @id @default(cuid())
+  organizationId     String
+  organization       Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  templateId         String?
+  template           ContractTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  reference          String?
+  title              String
+  /// Frozen copy of the text that was sent (merge fields already filled in)
+  bodyText           String
+  kind               String            @default("text")
+  /// Original PDF for kind=pdf (shared with the template; never deleted while referenced)
+  sourceFileUrl      String?
+  pageCount          Int?
+  /// SHA-256 of bodyText or of the source PDF, shown to the signer and on the certificate
+  contentHash        String?
+  publicToken        String            @unique @default(cuid())
+  employeeName       String?
+  /// Legacy free-text contact; new documents use employeePhone/employeeEmail
+  employeeContact    String?
+  employeePhone      String?
+  employeeEmail      String?
+  employeeNumber     String?
+  jobTitle           String?
+  batchId            String?
+  dueDate            DateTime?
+  requireCountersign Boolean           @default(false)
+  sentBy             String?
+  /// sent|viewed|awaiting_countersign|completed|declined|voided (legacy: signed)
+  status             String            @default("sent")
+  viewedAt           DateTime?
+  viewIp             String?
+  signerName         String?
+  signerIdNumber     String?
+  /// Legacy inline data URL; new signatures are stored at signatureUrl
+  signatureData      String?
+  signatureUrl       String?
+  signIp             String?
+  signUserAgent      String?
+  signedAt           DateTime?
+  declinedAt         DateTime?
+  declineReason      String?
+  voidedAt           DateTime?
+  voidReason         String?
+  countersignedAt    DateTime?
+  countersignName    String?
+  countersignUrl     String?
+  signedPdfUrl       String?
+  lastRemindedAt     DateTime?
+  reminderCount      Int               @default(0)
+  createdAt          DateTime          @default(now())
+
+  @@index([organizationId])
 }
 
 // ——— Equipment ———

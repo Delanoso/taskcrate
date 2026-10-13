@@ -113,7 +113,7 @@ const SERVER: Record<string, ProductSandbox> = {
       { id: "sign", label: "Sign once · stamp all pages" },
     ],
     successTitle: "State Transition Success",
-    successBody: "Signature stamped on every page · PDF ready.",
+    successBody: "Signed on every page · certificate added · PDF archived.",
   },
   "equipment-issuer": {
     screenTitle: "Issue equipment",
