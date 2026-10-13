@@ -177,6 +177,7 @@ async function stampPages(pdf: PDFDocument, pages: ReturnType<PDFDocument["getPa
 }
 
 async function appendix(doc: Awaited<ReturnType<typeof createBrandedDocument>>, d: ContractDocument, company: string, pageCount: number) {
+  doc.ensure(160);
   doc.heading("Signatures");
   const items: Parameters<typeof doc.signatures>[0] = [
     { label: "Employee", name: d.signerName ?? (d.signedAt ? d.employeeName : d.employeeName), date: d.signedAt, url: d.signatureUrl ?? d.signatureData, note: d.signedAt ? "" : "Not signed yet" },
