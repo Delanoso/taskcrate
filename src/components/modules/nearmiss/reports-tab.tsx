@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Download, FileText, Plus, Search } from "lucide-react";
 import { Button, Input, jsonFetch } from "@/components/modules/ui-bits";
-import { ReportForm, selectClass, type ReportPayload } from "@/components/modules/nearmiss/report-form";
+import { ReportForm, type ReportPayload } from "@/components/modules/nearmiss/report-form";
 import { ReportDetail, SeverityPill, StatusPill } from "@/components/modules/nearmiss/report-detail";
 import { fmtDate, type NearMissData, type Report } from "@/components/modules/nearmiss/types";
 import { REPORT_TYPES, severityLabel, statusLabel, typeLabel } from "@/lib/modules/nearmiss-options";
@@ -109,7 +109,7 @@ export function ReportsTab({ data, setData }: { data: NearMissData; setData: (d:
           <Search className="absolute left-2 top-2.5 size-4 text-muted-foreground" />
           <Input className="pl-8" placeholder="Search reference, description, location, person…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
-        <select className={`${selectClass} w-auto`} value={type} onChange={(e) => setType(e.target.value)}>
+        <select className="h-9 rounded-md border bg-background px-2 text-sm" value={type} onChange={(e) => setType(e.target.value)}>
           <option value="">All types</option>
           {REPORT_TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
         </select>

@@ -47,6 +47,7 @@ model Organization {
   leaveEmployees LeaveEmployee[]
   leaveSettings  LeaveSettings?
   disciplineLogs DisciplineEntry[]
+  disciplineSettings DisciplineSettings?
   onboardings    OnboardingPacket[]
   contracts      ContractDocument[]
   equipmentItems EquipmentItem[]
@@ -490,16 +491,72 @@ model LeaveSettings {
 }
 
 // ——— Discipline ———
+/// One disciplinary case: incident -> (hearing) -> sanction -> employee acknowledgement -> (appeal).
 model DisciplineEntry {
-  id             String       @id @default(cuid())
-  organizationId String
+  id                String       @id @default(cuid())
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reference         String?
+  employeeName      String
+  employeeNumber    String?
+  employeePhone     String?
+  jobTitle          String?
+  department        String?
+  /// Sanction: pending|counselling|verbal|written|final|dismissal|not_guilty (see discipline-options.ts)
+  stage             String
+  /// open|hearing|issued|finalised|withdrawn; legacy rows are finalised records
+  status            String       @default("finalised")
+  offenceKey        String?
+  offence           String?
+  offenceSeverity   String?      // minor|serious|dismissible
+  /// Incident description
+  notes             String
+  location          String?
+  witnesses         String?
+  /// Legacy single photo; new cases use photosJson
+  photoUrl          String?
+  photosJson        String       @default("[]")
+  incidentAt        DateTime
+  hearingAt         DateTime?
+  hearingVenue      String?
+  chairperson       String?
+  noticeIssuedAt    DateTime?
+  noticeAckAt       DateTime?
+  noticeAckSignature String?
+  finding           String?      // guilty|not_guilty
+  outcomeReasons    String?
+  mitigating        String?
+  aggravating       String?
+  sanctionDate      DateTime?
+  validUntil        DateTime?
+  issuedBy          String?
+  issuerSignature   String?
+  /// Lets the employee view and sign the notice/outcome from a WhatsApp link
+  signToken         String?      @unique
+  employeeSignature String?
+  employeeSignedAt  DateTime?
+  employeeComment   String?
+  refusedToSign     Boolean      @default(false)
+  witnessName       String?
+  witnessSignature  String?
+  appealLodgedAt    DateTime?
+  appealGrounds     String?
+  appealOutcome     String?      // upheld|dismissed|varied
+  appealNotes       String?
+  appealDecidedAt   DateTime?
+  withdrawnReason   String?
+  createdAt         DateTime     @default(now())
+
+  @@index([organizationId, incidentAt])
+}
+
+model DisciplineSettings {
+  organizationId String       @id
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  employeeName   String
-  stage          String // verbal|written|final|dismissal
-  notes          String
-  photoUrl       String?
-  incidentAt     DateTime
-  createdAt      DateTime     @default(now())
+  verbalMonths   Int          @default(3)
+  writtenMonths  Int          @default(6)
+  finalMonths    Int          @default(12)
+  defaultIssuer  String?
 }
 
 // ——— Onboard Docs ———

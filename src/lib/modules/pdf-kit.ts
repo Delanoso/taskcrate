@@ -128,6 +128,30 @@ export async function createBrandedDocument(input: {
       doc.y -= boxH + 8;
     },
 
+    /** Side-by-side signature boxes: image (if signed), then name and date under a line. */
+    async signatures(items: { label: string; name?: string | null; date?: Date | null; url?: string | null; note?: string }[]) {
+      const gap = 14;
+      const boxW = (PAGE_W - MARGIN * 2 - gap * (items.length - 1)) / items.length;
+      const boxH = 96;
+      doc.ensure(boxH + 10);
+      const top = doc.y;
+      for (const [i, it] of items.entries()) {
+        const x = MARGIN + i * (boxW + gap);
+        doc.page.drawText(fit(safe(it.label), bold, 9, boxW), { x, y: top, size: 9, font: bold, color: muted });
+        const img = await embedImage(pdf, it.url);
+        if (img) {
+          const s = Math.min((boxW - 4) / img.width, 46 / img.height);
+          doc.page.drawImage(img, { x, y: top - 54, width: img.width * s, height: img.height * s });
+        } else if (it.note) {
+          doc.page.drawText(fit(safe(it.note), font, 9, boxW), { x, y: top - 34, size: 9, font, color: muted });
+        }
+        doc.page.drawLine({ start: { x, y: top - 58 }, end: { x: x + boxW, y: top - 58 }, thickness: 0.6, color: rgb(0.6, 0.6, 0.6) });
+        doc.page.drawText(fit(safe(it.name || ""), font, 9, boxW), { x, y: top - 70, size: 9, font, color: ink });
+        if (it.date) doc.page.drawText(fmtDateTime(it.date), { x, y: top - 82, size: 8, font, color: muted });
+      }
+      doc.y = top - boxH;
+    },
+
     async finish() {
       pages.forEach((p, i) => {
         const label = `Page ${i + 1} of ${pages.length}`;

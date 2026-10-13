@@ -1,67 +1,55 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button, Input, Label, Card, CardContent, CardHeader, CardTitle, jsonFetch } from "@/components/modules/ui-bits";
-import { PhotoInput } from "@/components/modules/photo-input";
+import { FolderOpen, Settings, Users } from "lucide-react";
+import { jsonFetch } from "@/components/modules/ui-bits";
+import { CasesTab } from "@/components/modules/discipline/cases-tab";
+import { EmployeesTab } from "@/components/modules/discipline/employees-tab";
+import { SettingsTab } from "@/components/modules/discipline/settings-tab";
+import type { DisciplineData } from "@/components/modules/discipline/types";
+
+const TABS = [
+  { key: "cases", label: "Cases", icon: FolderOpen },
+  { key: "employees", label: "Employees", icon: Users },
+  { key: "settings", label: "Settings", icon: Settings },
+] as const;
+type Tab = (typeof TABS)[number]["key"];
 
 export function DisciplineAdmin() {
-  const [items, setItems] = useState<any[]>([]);
-  const [form, setForm] = useState({ employeeName: "", stage: "written", notes: "", incidentAt: "", photoDataUrl: "" });
+  const [data, setData] = useState<DisciplineData | null>(null);
+  const [tab, setTab] = useState<Tab>("cases");
+  const [employee, setEmployee] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  async function load() {
-    setItems((await jsonFetch("/api/modules/discipline")).items);
-  }
-  useEffect(() => { load().catch(console.error); }, []);
+  useEffect(() => {
+    jsonFetch<DisciplineData>("/api/modules/discipline")
+      .then(setData)
+      .catch((e) => setError(e instanceof Error ? e.message : "Could not load"));
+  }, []);
 
-  async function create(e: React.FormEvent) {
-    e.preventDefault();
-    await jsonFetch("/api/modules/discipline", {
-      method: "POST",
-      body: JSON.stringify({
-        ...form,
-        photoDataUrl: form.photoDataUrl || undefined,
-      }),
-    });
-    setForm({ employeeName: "", stage: "written", notes: "", incidentAt: "", photoDataUrl: "" });
-    load();
-  }
+  if (error) return <p className="text-sm text-destructive">{error}</p>;
+  if (!data) return <p className="text-sm text-muted-foreground">Loading cases…</p>;
+  const pending = data.cases.filter((c) => c.status === "issued").length;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <Card>
-        <CardHeader><CardTitle>Log discipline event</CardTitle></CardHeader>
-        <CardContent>
-          <form onSubmit={create} className="space-y-3">
-            <div className="space-y-2"><Label>Employee</Label><Input value={form.employeeName} onChange={(e) => setForm({ ...form, employeeName: e.target.value })} required /></div>
-            <div className="space-y-2">
-              <Label>Stage</Label>
-              <select className="h-9 w-full rounded-md border px-2 text-sm" value={form.stage} onChange={(e) => setForm({ ...form, stage: e.target.value })}>
-                <option value="verbal">Verbal</option>
-                <option value="written">Written</option>
-                <option value="final">Final</option>
-                <option value="dismissal">Dismissal</option>
-              </select>
-            </div>
-            <div className="space-y-2"><Label>Back-dated incident time</Label><Input type="datetime-local" value={form.incidentAt} onChange={(e) => setForm({ ...form, incidentAt: e.target.value })} required /></div>
-            <div className="space-y-2"><Label>Notes</Label><textarea className="min-h-24 w-full rounded-md border p-2 text-sm" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} required /></div>
-            <PhotoInput label="Camera evidence" onChange={(u) => setForm({ ...form, photoDataUrl: u ?? "" })} />
-            <Button type="submit">Save chronological entry</Button>
-          </form>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader><CardTitle>Progressive log (oldest first)</CardTitle></CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          {items.map((i) => (
-            <div key={i.id} className="border-b py-2">
-              <p className="font-medium">{i.employeeName} · {i.stage}</p>
-              <p className="text-muted-foreground">{new Date(i.incidentAt).toLocaleString()}</p>
-              <p>{i.notes}</p>
-              {i.photoUrl && <a className="underline text-xs" href={i.photoUrl} target="_blank" rel="noreferrer">Evidence</a>}
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+    <div className="space-y-4">
+      <div className="flex gap-1 overflow-x-auto border-b">
+        {TABS.map(({ key, label, icon: Icon }) => (
+          <button key={key} type="button" onClick={() => { setTab(key); if (key === "cases") setEmployee(null); }}
+            className={`flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+              tab === key ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}>
+            <Icon className="size-4" />
+            {label}
+            {key === "cases" && pending > 0 && <span className="rounded-full bg-blue-500 px-1.5 text-xs text-white" title="Awaiting signature">{pending}</span>}
+          </button>
+        ))}
+      </div>
+      {tab === "cases" && (
+        <CasesTab key={employee ?? "all"} data={data} setData={setData} employeeFilter={employee} clearEmployeeFilter={() => setEmployee(null)} />
+      )}
+      {tab === "employees" && <EmployeesTab data={data} openEmployee={(k) => { setEmployee(k); setTab("cases"); }} />}
+      {tab === "settings" && <SettingsTab data={data} setData={setData} />}
     </div>
   );
 }
