@@ -183,20 +183,21 @@ export const PRODUCTS: ProductDefinition[] = [
   {
     slug: "onboard-docs",
     name: "Onboard Docs",
-    tagline: "New-hire vault: ID, address, and encrypted bank details.",
+    tagline: "New-hire pack on their phone: details, bank, documents, signed consent.",
     description:
-      "Managers send a secure link. Hires upload ID/passport and proof of address, then complete an interactive bank-detail module into an encrypted folder.",
+      "Pick which documents you need and WhatsApp the new hire a secure link. They fill in their personal details (the SA ID number is checked and fills in date of birth), emergency contact and bank details, photograph their documents and sign a POPIA declaration. You review, send it back for fixes or approve it, add them to Leave Planner in one click, and download a payroll info sheet or the full personnel file.",
     category: "HR & Workforce",
     priceMonthlyZar: 1000,
     priceMonthlyUsd: 54,
     features: [
-      "Secure hire upload link",
-      "Encrypted bank details",
-      "ID & proof of address",
-      "Completion tracking",
+      "Choose the documents per hire, plus your own extras",
+      "SA ID validation, emergency contact and tax number",
+      "Encrypted personal and bank details, with every view logged",
+      "Review, request changes, approve and add to Leave Planner",
+      "Payroll info sheet PDF and personnel file ZIP",
     ],
     hasPdfExport: true,
-    hasSignatures: false,
+    hasSignatures: true,
     hasDateReminders: true,
   },
   {

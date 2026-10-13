@@ -561,18 +561,54 @@ model DisciplineSettings {
 
 // ——— Onboard Docs ———
 model OnboardingPacket {
-  id             String       @id @default(cuid())
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  employeeName   String
-  employeePhone  String?
-  publicToken    String       @unique @default(cuid())
-  idDocUrl       String?
-  addressDocUrl  String?
-  bankJson       String? // encrypted-at-rest placeholder JSON
-  status         String       @default("sent")
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id               String       @id @default(cuid())
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employeeName     String
+  employeePhone    String?
+  employeeEmail    String?
+  employeeNumber   String?
+  jobTitle         String?
+  department       String?
+  startDate        DateTime?
+  publicToken      String       @unique @default(cuid())
+  /// JSON array of item keys from src/lib/modules/onboard-items.ts ("custom:<label>" for extras)
+  requirementsJson String       @default("[]")
+  /// Legacy fixed uploads; new packets use OnboardingDocument rows
+  idDocUrl         String?
+  addressDocUrl    String?
+  /// AES-256-GCM encrypted JSON (see onboard-server.ts)
+  personalJson     String?
+  bankJson         String?
+  /// JSON array of { by, at } for every time bank details were revealed
+  bankViewLog      String       @default("[]")
+  consentName      String?
+  consentSignature String?
+  consentAt        DateTime?
+  /// sent|in_progress|submitted|changes_requested|approved (legacy: completed)
+  status           String       @default("sent")
+  reviewNote       String?
+  submittedAt      DateTime?
+  reviewedAt       DateTime?
+  reviewedBy       String?
+  leaveEmployeeId  String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  documents        OnboardingDocument[]
+}
+
+model OnboardingDocument {
+  id         String           @id @default(cuid())
+  packetId   String
+  packet     OnboardingPacket @relation(fields: [packetId], references: [id], onDelete: Cascade)
+  itemKey    String
+  fileUrl    String
+  fileName   String
+  mimeType   String
+  sizeBytes  Int
+  createdAt  DateTime         @default(now())
+
+  @@index([packetId])
 }
 
 // ——— Contract Sentinel ———

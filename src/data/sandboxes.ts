@@ -99,11 +99,11 @@ const SERVER: Record<string, ProductSandbox> = {
     screenTitle: "Onboard vault",
     subtitle: "New hire phone",
     steps: [
-      { id: "id", label: "Upload ID + address" },
-      { id: "bank", label: "Save bank details" },
+      { id: "id", label: "Fill in details + photograph documents" },
+      { id: "bank", label: "Bank details + sign consent" },
     ],
     successTitle: "State Transition Success",
-    successBody: "Packet Sent → Completed (bank encrypted).",
+    successBody: "Pack submitted → HR reviews and approves.",
   },
   "contract-sentinel": {
     screenTitle: "Contract sign",

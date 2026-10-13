@@ -1,65 +1,52 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createCipheriv, randomBytes, scryptSync } from "crypto";
 import { db } from "@/lib/db";
-import { saveDataUrlUpload } from "@/lib/uploads";
+import { companyName, notFound, parseBody } from "@/lib/modules/common";
+import { maskAccount, type Personal } from "@/lib/modules/onboard-items";
+import { EDITABLE, bankInput, decrypt, encrypt, loadPublicPacket, personalInput, progress, readBank, serializeDetail } from "@/lib/modules/onboard-server";
 
-function encryptBank(json: string) {
-  const key = scryptSync(process.env.SESSION_SECRET ?? "dev", "bank-salt", 32);
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", key, iv);
-  const enc = Buffer.concat([cipher.update(json, "utf8"), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return Buffer.concat([iv, tag, enc]).toString("base64");
-}
-
+/** The hire's own view of their pack. Bank number is masked even here. */
 export async function GET(_req: Request, { params }: { params: Promise<{ token: string }> }) {
-  const { token } = await params;
-  const item = await db.onboardingPacket.findUnique({
-    where: { publicToken: token },
-    include: { organization: { include: { branding: true } } },
-  });
-  if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const p = await loadPublicPacket((await params).token);
+  if (!p) return notFound();
+  const d = serializeDetail(p);
+  const bank = readBank(p.bankJson);
   return NextResponse.json({
-    packet: {
-      employeeName: item.employeeName,
-      status: item.status,
-      companyName: item.organization.branding?.displayName ?? item.organization.name,
-    },
+    company: await companyName(p.organizationId),
+    employeeName: p.employeeName,
+    jobTitle: p.jobTitle,
+    startDate: d.startDate,
+    status: d.status,
+    editable: EDITABLE.includes(p.status),
+    reviewNote: p.status === "changes_requested" ? p.reviewNote : null,
+    requirements: d.requirements,
+    personal: decrypt<Personal>(p.personalJson),
+    defaults: { cellphone: p.employeePhone, email: p.employeeEmail },
+    bank: bank ? { bankName: bank.bankName, accountHolder: bank.accountHolder, accountType: bank.accountType, branchCode: bank.branchCode, accountMasked: maskAccount(bank.accountNumber) } : null,
+    progress: progress(p),
+    consentName: p.consentName,
+    submittedAt: d.submittedAt,
   });
 }
 
-export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
-  const { token } = await params;
-  const item = await db.onboardingPacket.findUnique({ where: { publicToken: token } });
-  if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const body = z.object({
-    idDocDataUrl: z.string().startsWith("data:"),
-    addressDocDataUrl: z.string().startsWith("data:"),
-    bank: z.object({
-      bankName: z.string().min(2),
-      accountName: z.string().min(2),
-      accountNumber: z.string().min(5),
-      branchCode: z.string().min(2),
-    }),
-  }).parse(await req.json());
-  const folder = `onboard/${item.organizationId}`;
-  const idDocUrl = await saveDataUrlUpload(
-    body.idDocDataUrl.startsWith("data:image/") ? body.idDocDataUrl : body.idDocDataUrl.replace(/^data:[^;]+/, "data:image/jpeg"),
-    folder,
-  ).catch(() => "/uploads/placeholder-id");
-  const addressDocUrl = await saveDataUrlUpload(
-    body.addressDocDataUrl.startsWith("data:image/") ? body.addressDocDataUrl : body.addressDocDataUrl.replace(/^data:[^;]+/, "data:image/jpeg"),
-    folder,
-  ).catch(() => "/uploads/placeholder-address");
-  await db.onboardingPacket.update({
-    where: { id: item.id },
-    data: {
-      idDocUrl,
-      addressDocUrl,
-      bankJson: encryptBank(JSON.stringify(body.bank)),
-      status: "completed",
-    },
-  });
+const save = z.discriminatedUnion("step", [
+  z.object({ step: z.literal("personal"), data: personalInput }),
+  z.object({ step: z.literal("bank"), data: bankInput }),
+]);
+
+export async function PUT(req: Request, { params }: { params: Promise<{ token: string }> }) {
+  const p = await loadPublicPacket((await params).token);
+  if (!p) return notFound();
+  if (!EDITABLE.includes(p.status)) return NextResponse.json({ error: "Your pack has been submitted and can no longer be changed." }, { status: 409 });
+  const body = await parseBody(req, save);
+  if ("error" in body) return body.error;
+  const b = body.data;
+  const status = p.status === "sent" ? "in_progress" : p.status;
+  if (b.step === "personal") {
+    const clean = { ...b.data, email: b.data.email || null, taxNumber: b.data.taxNumber || null, idNumber: b.data.idNumber.replace(/\s/g, "") };
+    await db.onboardingPacket.update({ where: { id: p.id }, data: { personalJson: encrypt(JSON.stringify(clean)), status } });
+  } else {
+    await db.onboardingPacket.update({ where: { id: p.id }, data: { bankJson: encrypt(JSON.stringify(b.data)), status } });
+  }
   return NextResponse.json({ ok: true });
 }
