@@ -74,6 +74,10 @@ export function pdfResponse(bytes: Uint8Array, fileName: string) {
   });
 }
 
+export function clientIp(req: Request) {
+  return (req.headers.get("x-forwarded-for")?.split(",")[0] ?? req.headers.get("x-real-ip") ?? "").trim().slice(0, 64) || null;
+}
+
 /** "YYYY-MM-DD" in South African time. */
 export function saDateKey(d: Date = new Date()) {
   return d.toLocaleDateString("en-CA", { timeZone: "Africa/Johannesburg" });

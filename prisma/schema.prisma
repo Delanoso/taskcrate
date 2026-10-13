@@ -53,6 +53,7 @@ model Organization {
   contractTemplates ContractTemplate[]
   equipmentItems EquipmentItem[]
   equipmentLogs  EquipmentCustodyLog[]
+  equipmentIssues EquipmentIssue[]
   loanRecords    LoanDeductibleRecord[]
   jobCards       JobCard[]
   stockItems     StockItem[]
@@ -694,26 +695,91 @@ model ContractDocument {
 
 // ——— Equipment ———
 model EquipmentItem {
-  id             String       @id @default(cuid())
+  id             String           @id @default(cuid())
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name           String
   assetTag       String?
-  status         String       @default("available") // available|issued
-  createdAt      DateTime     @default(now())
+  category       String           @default("other")
+  serialNumber   String?
+  value          Float?
+  condition      String           @default("good") // new|good|fair|poor|damaged
+  status         String           @default("available") // available|issued|repair|lost|retired
+  location       String?
+  notes          String?
+  photoUrl       String?
+  updatedAt      DateTime         @default(now()) @updatedAt
+  createdAt      DateTime         @default(now())
+  issues         EquipmentIssue[]
+
+  @@index([organizationId])
 }
 
+/// One custody period: issued to a person, signed for, and (later) handed back and inspected.
+model EquipmentIssue {
+  id                 String        @id @default(cuid())
+  organizationId     String
+  organization       Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  itemId             String
+  item               EquipmentItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  batchId            String
+  documentNumber     String
+  publicToken        String        @unique
+  employeeName       String
+  employeeNumber     String?
+  employeePhone      String?
+  dueBackAt          DateTime?
+  conditionOut       String
+  accessories        String?
+  notesOut           String?
+  issuedBy           String?
+  status             String        @default("awaiting_signature") // awaiting_signature|active|returned|lost|cancelled
+  signMethod         String        @default("in_person") // in_person|link
+  signerName         String?
+  signatureUrl       String?
+  signedAt           DateTime?
+  signIp             String?
+  lastRemindedAt     DateTime?
+  reminderCount      Int           @default(0)
+  returnBatchId      String?
+  handbackNumber     String?
+  returnedAt         DateTime?
+  receivedBy         String?
+  conditionIn        String?
+  checklistJson      String?
+  damageNotes        String?
+  photosJson         String?
+  repairCost         Float?
+  outcome            String? // stock|repair|retired|lost
+  employeePresent    Boolean       @default(true)
+  returnSignerName   String?
+  returnSignatureUrl String?
+  inspectorSignature String?
+  deductibleId       String?
+  cancelReason       String?
+  createdAt          DateTime      @default(now())
+
+  @@index([organizationId])
+  @@index([itemId])
+  @@index([batchId])
+}
+
+/// Event trail per item (issue, handback, repair, edits).
 model EquipmentCustodyLog {
   id             String        @id @default(cuid())
   organizationId String
   organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   itemId         String
+  issueId        String?
   employeeName   String
-  action         String // issue|handback
+  action         String // issue|signed|handback|lost|repair_done|cancelled|note
+  by             String?
   signatureData  String?
   conditionNotes String?
   damagePhotoUrl String?
   createdAt      DateTime      @default(now())
+
+  @@index([itemId])
 }
 
 // ——— Loan / Deductible ———

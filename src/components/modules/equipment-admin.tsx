@@ -1,131 +1,97 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Button, Input, Label, Card, CardContent, CardHeader, CardTitle, jsonFetch } from "@/components/modules/ui-bits";
-import { SignaturePad } from "@/components/platform/signature-pad";
-import { PhotoInput } from "@/components/modules/photo-input";
+import { useCallback, useEffect, useState } from "react";
+import { ArrowDownToLine, ArrowUpFromLine, Boxes, History, PackageOpen, Users, Wrench } from "lucide-react";
+import { jsonFetch } from "@/components/modules/ui-bits";
+import { OutTab } from "@/components/modules/equipment/out-tab";
+import { IssueTab } from "@/components/modules/equipment/issue-tab";
+import { CheckInTab } from "@/components/modules/equipment/checkin-tab";
+import { RegisterTab } from "@/components/modules/equipment/register-tab";
+import { PeopleTab } from "@/components/modules/equipment/people-tab";
+import { RepairsTab, ReturnsTab } from "@/components/modules/equipment/returns-tab";
+import { isOpen, type EquipData } from "@/components/modules/equipment/types";
 
-function useEquipment() {
-  const [items, setItems] = useState<any[]>([]);
-  const [logs, setLogs] = useState<any[]>([]);
-  async function load() {
-    const d = await jsonFetch("/api/modules/equipment");
-    setItems(d.items); setLogs(d.logs);
-  }
-  useEffect(() => { load().catch(console.error); }, []);
-  return { items, logs, load };
-}
+const ALL = {
+  out: { label: "Out now", icon: PackageOpen },
+  issue: { label: "Issue", icon: ArrowUpFromLine },
+  checkin: { label: "Check in", icon: ArrowDownToLine },
+  repairs: { label: "Repairs", icon: Wrench },
+  returns: { label: "Returns", icon: History },
+  register: { label: "Register", icon: Boxes },
+  people: { label: "People", icon: Users },
+} as const;
+type Tab = keyof typeof ALL;
 
-export function EquipmentAdmin() {
-  const { items, logs, load } = useEquipment();
-  const [name, setName] = useState("");
-  const [itemId, setItemId] = useState("");
-  const [employeeName, setEmployeeName] = useState("");
-  const [signature, setSignature] = useState<string | null>(null);
+const ORDER: Record<"issuer" | "handback", Tab[]> = {
+  issuer: ["out", "issue", "checkin", "register", "people"],
+  handback: ["checkin", "repairs", "returns", "out", "register", "people"],
+};
 
-  async function createItem(e: React.FormEvent) {
-    e.preventDefault();
-    await jsonFetch("/api/modules/equipment", { method: "POST", body: JSON.stringify({ action: "create_item", name }) });
-    setName(""); load();
-  }
+export function EquipmentWorkspace({ mode }: { mode: "issuer" | "handback" }) {
+  const [data, setData] = useState<EquipData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>(ORDER[mode][0]);
+  const [checkInFor, setCheckInFor] = useState<string | null>(null);
+  const [issueTo, setIssueTo] = useState<string | null>(null);
 
-  async function issue(e: React.FormEvent) {
-    e.preventDefault();
-    if (!signature) return alert("Signature required");
-    await jsonFetch("/api/modules/equipment", {
-      method: "POST",
-      body: JSON.stringify({ action: "issue", itemId, employeeName, signatureData: signature }),
-    });
-    setEmployeeName(""); setSignature(null); load();
-  }
-
-  return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <Card>
-        <CardHeader><CardTitle>Add equipment</CardTitle></CardHeader>
-        <CardContent>
-          <form onSubmit={createItem} className="flex gap-2">
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Laptop / tool / keys" required />
-            <Button type="submit">Add</Button>
-          </form>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader><CardTitle>Issue with custody signature</CardTitle></CardHeader>
-        <CardContent>
-          <form onSubmit={issue} className="space-y-3">
-            <select className="h-9 w-full rounded-md border px-2 text-sm" value={itemId} onChange={(e) => setItemId(e.target.value)} required>
-              <option value="">Select available item</option>
-              {items.filter((i) => i.status === "available").map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-            </select>
-            <Input value={employeeName} onChange={(e) => setEmployeeName(e.target.value)} placeholder="Employee name" required />
-            <SignaturePad onChange={setSignature} />
-            <Button type="submit">Issue</Button>
-          </form>
-        </CardContent>
-      </Card>
-      <Card className="lg:col-span-2">
-        <CardHeader><CardTitle>Custody log</CardTitle></CardHeader>
-        <CardContent className="text-sm space-y-2">
-          {logs.map((l) => (
-            <div key={l.id} className="border-b py-2">{l.action} · {l.employeeName} · {new Date(l.createdAt).toLocaleString()}</div>
-          ))}
-        </CardContent>
-      </Card>
-    </div>
+  const reload = useCallback(
+    () =>
+      jsonFetch<EquipData>("/api/modules/equipment")
+        .then((d) => {
+          setData(d);
+          return d;
+        })
+        .catch((e) => {
+          setError(e instanceof Error ? e.message : "Could not load");
+          return null;
+        }),
+    [],
   );
-}
 
-export function EquipmentHandbackAdmin() {
-  const { items, logs, load } = useEquipment();
-  const [itemId, setItemId] = useState("");
-  const [employeeName, setEmployeeName] = useState("");
-  const [conditionNotes, setConditionNotes] = useState("");
-  const [photo, setPhoto] = useState<string | null>(null);
-  const [signature, setSignature] = useState<string | null>(null);
-
-  async function handback(e: React.FormEvent) {
-    e.preventDefault();
-    await jsonFetch("/api/modules/equipment", {
-      method: "POST",
-      body: JSON.stringify({
-        action: "handback",
-        itemId,
-        employeeName,
-        conditionNotes,
-        damagePhotoDataUrl: photo ?? undefined,
-        signatureData: signature ?? undefined,
-      }),
+  useEffect(() => {
+    reload().then((d) => {
+      if (d && mode === "issuer" && !d.items.length) setTab("register");
     });
-    setEmployeeName(""); setConditionNotes(""); setPhoto(null); setSignature(null); load();
-  }
+  }, [reload, mode]);
+
+  if (error) return <p className="text-sm text-destructive">{error}</p>;
+  if (!data) return <p className="text-sm text-muted-foreground">Loading equipment…</p>;
+
+  const open = data.issues.filter(isOpen);
+  const badge: Partial<Record<Tab, number>> = {
+    out: open.filter((x) => x.overdue || x.status === "awaiting_signature").length,
+    checkin: mode === "handback" ? open.filter((x) => x.overdue).length : 0,
+    repairs: data.items.filter((i) => i.status === "repair").length,
+  };
+  const go = {
+    checkIn: (person: string) => { setCheckInFor(person); setTab("checkin"); },
+    issue: (person: string | null) => { setIssueTo(person); setTab("issue"); },
+  };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <Card>
-        <CardHeader><CardTitle>Handback inspection</CardTitle></CardHeader>
-        <CardContent>
-          <form onSubmit={handback} className="space-y-3">
-            <select className="h-9 w-full rounded-md border px-2 text-sm" value={itemId} onChange={(e) => setItemId(e.target.value)} required>
-              <option value="">Select issued item</option>
-              {items.filter((i) => i.status === "issued").map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-            </select>
-            <Input value={employeeName} onChange={(e) => setEmployeeName(e.target.value)} placeholder="Returning employee" required />
-            <textarea className="min-h-20 w-full rounded-md border p-2 text-sm" placeholder="Condition notes" value={conditionNotes} onChange={(e) => setConditionNotes(e.target.value)} />
-            <PhotoInput label="Damage photo (if any)" onChange={setPhoto} />
-            <SignaturePad onChange={setSignature} />
-            <Button type="submit">Check back into inventory</Button>
-          </form>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader><CardTitle>Recent handbacks</CardTitle></CardHeader>
-        <CardContent className="text-sm space-y-2">
-          {logs.filter((l) => l.action === "handback").map((l) => (
-            <div key={l.id} className="border-b py-2">{l.employeeName} · {l.conditionNotes || "OK"} · {new Date(l.createdAt).toLocaleString()}</div>
-          ))}
-        </CardContent>
-      </Card>
+    <div className="space-y-4">
+      <div className="flex gap-1 overflow-x-auto border-b">
+        {ORDER[mode].map((key) => {
+          const { label, icon: Icon } = ALL[key];
+          return (
+            <button key={key} type="button" onClick={() => { setTab(key); setCheckInFor(null); setIssueTo(null); }}
+              className={`flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+                tab === key ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}>
+              <Icon className="size-4" />
+              {label}
+              {!!badge[key] && <span className="rounded-full bg-amber-500 px-1.5 text-xs text-white">{badge[key]}</span>}
+            </button>
+          );
+        })}
+      </div>
+      {tab === "out" && <OutTab data={data} reload={reload} go={go} />}
+      {tab === "issue" && <IssueTab key={issueTo ?? "new"} data={data} reload={reload} initialPerson={issueTo} />}
+      {tab === "checkin" && <CheckInTab key={checkInFor ?? "pick"} data={data} reload={reload} initialPerson={checkInFor} />}
+      {tab === "repairs" && <RepairsTab data={data} reload={reload} />}
+      {tab === "returns" && <ReturnsTab data={data} reload={reload} go={go} />}
+      {tab === "register" && <RegisterTab data={data} reload={reload} go={go} />}
+      {tab === "people" && <PeopleTab data={data} reload={reload} go={go} />}
     </div>
   );
 }

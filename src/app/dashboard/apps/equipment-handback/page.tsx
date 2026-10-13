@@ -1,10 +1,10 @@
 import { ModuleAppShell } from "@/lib/modules/app-page";
-import { EquipmentHandbackAdmin } from "@/components/modules/equipment-admin";
+import { EquipmentWorkspace } from "@/components/modules/equipment-admin";
 
 export default function Page() {
   return (
     <ModuleAppShell slug="equipment-handback">
-      <EquipmentHandbackAdmin />
+      <EquipmentWorkspace mode="handback" />
     </ModuleAppShell>
   );
 }

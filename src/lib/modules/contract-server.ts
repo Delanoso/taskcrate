@@ -17,9 +17,7 @@ export const sha256 = (data: string | Uint8Array) => createHash("sha256").update
 export const signingUrl = (token: string) => `${appUrl()}/p/contract/${token}`;
 export const newToken = () => randomBytes(16).toString("base64url");
 
-export function clientIp(req: Request) {
-  return (req.headers.get("x-forwarded-for")?.split(",")[0] ?? req.headers.get("x-real-ip") ?? "").trim().slice(0, 64) || null;
-}
+export { clientIp } from "@/lib/modules/common";
 
 /** Legacy rows were "signed" with no countersign step. */
 export const normStatus = (s: string) => (s === "signed" ? "completed" : s);

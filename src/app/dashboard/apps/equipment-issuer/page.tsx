@@ -1,10 +1,10 @@
 import { ModuleAppShell } from "@/lib/modules/app-page";
-import { EquipmentAdmin } from "@/components/modules/equipment-admin";
+import { EquipmentWorkspace } from "@/components/modules/equipment-admin";
 
 export default function Page() {
   return (
     <ModuleAppShell slug="equipment-issuer">
-      <EquipmentAdmin />
+      <EquipmentWorkspace mode="issuer" />
     </ModuleAppShell>
   );
 }

@@ -6,16 +6,16 @@ import { companyName, parseBody, saDateKey, staffName } from "@/lib/modules/comm
 import { fillMerge } from "@/lib/modules/contract-library";
 import { OPEN, SLUG, contentHashFor, newToken, normStatus, sendInput, serializeDoc, serializeTemplate } from "@/lib/modules/contract-server";
 import { nextDocumentNumber } from "@/lib/modules/pdf-kit";
+import { peopleDirectory } from "@/lib/modules/people";
 
 export async function GET() {
   const gate = await requireProductApi(SLUG);
   if ("error" in gate) return gate.error;
   const orgId = gate.session.organizationId;
-  const [docs, templates, leaveEmployees, packets, me] = await Promise.all([
+  const [docs, templates, directory, me] = await Promise.all([
     db.contractDocument.findMany({ where: { organizationId: orgId }, include: { template: { select: { name: true } } }, orderBy: { createdAt: "desc" } }),
     db.contractTemplate.findMany({ where: { organizationId: orgId }, orderBy: [{ archived: "asc" }, { name: "asc" }] }),
-    db.leaveEmployee.findMany({ where: { organizationId: orgId, active: true }, select: { fullName: true, employeeNumber: true, phone: true }, orderBy: { fullName: "asc" } }),
-    db.onboardingPacket.findMany({ where: { organizationId: orgId, status: { in: ["submitted", "approved", "completed"] } }, select: { employeeName: true, employeeNumber: true, employeePhone: true, employeeEmail: true, jobTitle: true } }),
+    peopleDirectory(orgId),
     staffName(gate.session.userId),
   ]);
 
@@ -30,20 +30,13 @@ export async function GET() {
     counts.set(d.templateId, c);
   }
 
-  const directory = new Map<string, { name: string; employeeNumber: string | null; phone: string | null; email: string | null; jobTitle: string | null }>();
-  for (const p of packets) directory.set(p.employeeName.toLowerCase(), { name: p.employeeName, employeeNumber: p.employeeNumber, phone: p.employeePhone, email: p.employeeEmail, jobTitle: p.jobTitle });
-  for (const e of leaveEmployees) {
-    const prev = directory.get(e.fullName.toLowerCase());
-    directory.set(e.fullName.toLowerCase(), { name: e.fullName, employeeNumber: e.employeeNumber ?? prev?.employeeNumber ?? null, phone: e.phone ?? prev?.phone ?? null, email: prev?.email ?? null, jobTitle: prev?.jobTitle ?? null });
-  }
-
   return NextResponse.json({
     company: await companyName(orgId),
     me,
     canManage: gate.access.role !== "MEMBER",
     templates: templates.map((t) => serializeTemplate(t, counts.get(t.id))),
     documents: docs.map(serializeDoc),
-    directory: [...directory.values()].sort((a, b) => a.name.localeCompare(b.name)),
+    directory,
   });
 }
 

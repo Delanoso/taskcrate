@@ -119,21 +119,21 @@ const SERVER: Record<string, ProductSandbox> = {
     screenTitle: "Issue equipment",
     subtitle: "Custody signature",
     steps: [
-      { id: "pick", label: "Select laptop / tool" },
-      { id: "sign", label: "Worker signs custody" },
+      { id: "pick", label: "Pick laptop, drill, radio" },
+      { id: "sign", label: "Worker signs custody terms" },
     ],
     successTitle: "State Transition Success",
-    successBody: "Item Available → Issued with legal custody.",
+    successBody: "In store → Issued · custody PDF · due back date set.",
   },
   "equipment-handback": {
     screenTitle: "Handback",
     subtitle: "Return inspection",
     steps: [
-      { id: "photo", label: "Log damage photo" },
-      { id: "in", label: "Check into inventory" },
+      { id: "photo", label: "Inspect · photo damage" },
+      { id: "in", label: "Both sign · back to store" },
     ],
     successTitle: "State Transition Success",
-    successBody: "Item Issued → Available. Condition noted.",
+    successBody: "Issued → In store / repair · handback PDF · deductible raised.",
   },
   "loan-deductible-ledger": {
     screenTitle: "AOD consent",
