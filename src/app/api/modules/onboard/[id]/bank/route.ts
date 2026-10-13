@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireProductApi } from "@/lib/modules/api-guard";
 import { managersOnly, notFound, staffName } from "@/lib/modules/common";
-import { SLUG, readBank } from "@/lib/modules/onboard-server";
+import { SLUG, logBankView, readBank } from "@/lib/modules/onboard-server";
 
 /** Reveals the decrypted bank details to a manager and records who looked. */
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -14,11 +14,6 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   if (!p) return notFound();
   const bank = readBank(p.bankJson);
   if (!bank) return NextResponse.json({ error: "No bank details captured yet." }, { status: 404 });
-  let log: { by: string; at: string }[] = [];
-  try {
-    log = JSON.parse(p.bankViewLog);
-  } catch {}
-  log.push({ by: await staffName(gate.session.userId), at: new Date().toISOString() });
-  await db.onboardingPacket.update({ where: { id: p.id }, data: { bankViewLog: JSON.stringify(log.slice(-100)) } });
-  return NextResponse.json({ bank, views: log });
+  const views = await logBankView(p, await staffName(gate.session.userId));
+  return NextResponse.json({ bank, views });
 }

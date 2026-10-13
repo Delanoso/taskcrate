@@ -100,6 +100,18 @@ export const packetInput = z.object({
 
 export const publicUrl = (token: string) => `${appUrl()}/p/onboard/${token}`;
 
+/** Appends to the audit trail of who saw the full bank details, and returns the trail. */
+export async function logBankView(p: Pick<OnboardingPacket, "id" | "bankViewLog">, by: string) {
+  let log: { by: string; at: string }[] = [];
+  try {
+    log = JSON.parse(p.bankViewLog);
+  } catch {}
+  log.push({ by, at: new Date().toISOString() });
+  log = log.slice(-100);
+  await db.onboardingPacket.update({ where: { id: p.id }, data: { bankViewLog: JSON.stringify(log) } });
+  return log;
+}
+
 /** Statuses in which the new hire may still change their pack. */
 export const EDITABLE = ["sent", "in_progress", "changes_requested"];
 

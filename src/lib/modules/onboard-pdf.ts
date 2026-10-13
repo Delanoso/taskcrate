@@ -63,7 +63,7 @@ export async function buildInfoSheet(p: OnboardingPacket & { documents: Onboardi
   doc.y -= 6;
   await doc.signatures([
     { label: "Employee", name: p.consentName, date: p.consentAt, url: p.consentSignature, note: p.consentAt ? "" : "Not signed" },
-    { label: "Approved by", name: p.reviewedBy, date: p.status === "approved" ? p.reviewedAt : null },
+    p.status === "approved" ? { label: "Approved by", name: p.reviewedBy, date: p.reviewedAt } : { label: "Approved by", note: "Not yet approved" },
   ]);
   if (p.submittedAt) doc.paragraph(`Submitted ${fmtDateTime(p.submittedAt)}`, { size: 8, color: doc.muted });
   return doc.finish();

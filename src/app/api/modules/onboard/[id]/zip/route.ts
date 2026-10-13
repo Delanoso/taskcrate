@@ -1,10 +1,10 @@
 import { db } from "@/lib/db";
 import { requireProductApi } from "@/lib/modules/api-guard";
-import { managersOnly, notFound } from "@/lib/modules/common";
+import { managersOnly, notFound, staffName } from "@/lib/modules/common";
 import { readDocument } from "@/lib/file-storage";
 import { itemLabel } from "@/lib/modules/onboard-items";
 import { buildInfoSheet } from "@/lib/modules/onboard-pdf";
-import { FOLDER, SLUG } from "@/lib/modules/onboard-server";
+import { FOLDER, SLUG, logBankView } from "@/lib/modules/onboard-server";
 import { nextDocumentNumber } from "@/lib/modules/pdf-kit";
 import { buildZip } from "@/lib/zip";
 
@@ -18,6 +18,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (denied) return denied;
   const p = await db.onboardingPacket.findFirst({ where: { id: (await params).id, organizationId: gate.session.organizationId }, include: { documents: true } });
   if (!p) return notFound();
+  if (p.bankJson) await logBankView(p, `${await staffName(gate.session.userId)} (ZIP)`);
 
   const files: { name: string; data: Buffer }[] = [];
   files.push({ name: "Employee information.pdf", data: Buffer.from(await buildInfoSheet(p, await nextDocumentNumber(p.organizationId, "EMP"))) });
