@@ -143,17 +143,17 @@ export const PRODUCTS: ProductDefinition[] = [
   {
     slug: "leave-planner",
     name: "Leave Planner",
-    tagline: "Leave requests with level-based approval logic.",
+    tagline: "Company leave planner with automatic accrual and WhatsApp approvals.",
     description:
-      "Universal employee leave link with admin rules: which levels need formal approval, which auto-pass, and dynamic calendar blackout dates.",
+      "Load your employees and their balances once — annual leave accrues every month, approved leave is deducted automatically (weekends and public holidays skipped), cancelled leave goes back on the balance, and every approval or decline goes to the employee on WhatsApp.",
     category: "HR & Workforce",
     priceMonthlyZar: 1000,
     priceMonthlyUsd: 54,
     features: [
-      "Level-based approval rules",
-      "Calendar blackouts",
-      "Manager queues",
-      "Leave register PDF",
+      "Employee import with opening balances",
+      "Automatic accrual & deduction",
+      "Team planner calendar",
+      "WhatsApp approvals",
     ],
     hasPdfExport: true,
     hasSignatures: true,

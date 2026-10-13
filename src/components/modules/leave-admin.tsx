@@ -1,70 +1,81 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Button, Input, Label, Card, CardContent, CardHeader, CardTitle, LinkBox, StatusBadge, jsonFetch } from "@/components/modules/ui-bits";
+import { useCallback, useEffect, useState } from "react";
+import { CalendarDays, Inbox, Settings, Users, X } from "lucide-react";
+import { Button, jsonFetch } from "@/components/modules/ui-bits";
+import { LeavePlanner } from "@/components/modules/leave/planner";
+import { LeaveRequests } from "@/components/modules/leave/requests-tab";
+import { LeaveEmployees } from "@/components/modules/leave/employees-tab";
+import { LeaveSettingsTab } from "@/components/modules/leave/settings-tab";
+import type { LeaveData, WaPrompt } from "@/components/modules/leave/types";
+
+const TABS = [
+  { key: "planner", label: "Planner", icon: CalendarDays },
+  { key: "requests", label: "Requests", icon: Inbox },
+  { key: "employees", label: "Employees", icon: Users },
+  { key: "settings", label: "Settings", icon: Settings },
+] as const;
+type Tab = (typeof TABS)[number]["key"];
 
 export function LeaveAdmin() {
-  const [rules, setRules] = useState<any[]>([]);
-  const [requests, setRequests] = useState<any[]>([]);
-  const [requestUrl, setRequestUrl] = useState("");
-  const [levelName, setLevelName] = useState("Staff");
-  const [mode, setMode] = useState("approve");
+  const [data, setData] = useState<LeaveData | null>(null);
+  const [tab, setTab] = useState<Tab>("planner");
+  const [wa, setWa] = useState<WaPrompt>(null);
 
-  async function load() {
-    const d = await jsonFetch("/api/modules/leave");
-    setRules(d.rules); setRequests(d.requests); setRequestUrl(d.requestUrl);
-  }
-  useEffect(() => { load().catch(console.error); }, []);
+  const reload = useCallback(() => jsonFetch<LeaveData>("/api/modules/leave").then(setData), []);
+  useEffect(() => {
+    jsonFetch<LeaveData>("/api/modules/leave")
+      .then((d) => {
+        setData(d);
+        if (d.employees.length === 0) setTab("employees");
+      })
+      .catch(console.error);
+  }, []);
 
-  async function saveRule(e: React.FormEvent) {
-    e.preventDefault();
-    await jsonFetch("/api/modules/leave", { method: "POST", body: JSON.stringify({ levelName, mode }) });
-    load();
-  }
-
-  async function decide(id: string, status: "approved" | "rejected") {
-    await jsonFetch("/api/modules/leave", { method: "PATCH", body: JSON.stringify({ id, status }) });
-    load();
-  }
+  if (!data) return <p className="text-sm text-muted-foreground">Loading leave planner…</p>;
+  const pending = data.requests.filter((r) => r.status === "pending").length;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <Card>
-        <CardHeader><CardTitle>Level rules</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          <LinkBox url={requestUrl} />
-          <form onSubmit={saveRule} className="space-y-3">
-            <div className="space-y-2"><Label>Level</Label><Input value={levelName} onChange={(e) => setLevelName(e.target.value)} /></div>
-            <div className="space-y-2">
-              <Label>Mode</Label>
-              <select className="h-9 w-full rounded-md border px-2 text-sm" value={mode} onChange={(e) => setMode(e.target.value)}>
-                <option value="approve">Requires approval</option>
-                <option value="auto">Auto-approve</option>
-                <option value="block">Block</option>
-              </select>
-            </div>
-            <Button type="submit">Save rule</Button>
-          </form>
-          <ul className="text-sm space-y-1">{rules.map((r) => <li key={r.id}>{r.levelName}: {r.mode}</li>)}</ul>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader><CardTitle>Requests</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
-          {requests.map((r) => (
-            <div key={r.id} className="rounded-md border p-3 text-sm">
-              <div className="flex justify-between"><span className="font-medium">{r.employeeName}</span><StatusBadge status={r.status} /></div>
-              <p className="text-muted-foreground">{r.employeeLevel} · {new Date(r.startDate).toLocaleDateString()} → {new Date(r.endDate).toLocaleDateString()}</p>
-              {r.status === "pending" && (
-                <div className="mt-2 flex gap-2">
-                  <Button size="sm" onClick={() => decide(r.id, "approved")}>Approve</Button>
-                  <Button size="sm" variant="outline" onClick={() => decide(r.id, "rejected")}>Reject</Button>
-                </div>
-              )}
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+    <div className="space-y-4">
+      <div className="flex gap-1 overflow-x-auto border-b">
+        {TABS.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            className={`flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+              tab === key ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Icon className="size-4" />
+            {label}
+            {key === "requests" && pending > 0 && (
+              <span className="rounded-full bg-amber-500 px-1.5 text-xs text-white">{pending}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {wa && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-green-300 bg-green-50 px-3 py-2 text-sm dark:border-green-900 dark:bg-green-950/40">
+          <span>{wa.text}</span>
+          <div className="flex items-center gap-2">
+            {wa.url && (
+              <Button asChild size="sm" className="bg-[#25D366] text-white hover:bg-[#1ebe5a]">
+                <a href={wa.url} target="_blank" rel="noreferrer" onClick={() => setWa(null)}>Send on WhatsApp</a>
+              </Button>
+            )}
+            <button type="button" aria-label="Dismiss" onClick={() => setWa(null)} className="text-muted-foreground hover:text-foreground">
+              <X className="size-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {tab === "planner" && <LeavePlanner data={data} />}
+      {tab === "requests" && <LeaveRequests data={data} reload={reload} onWhatsApp={setWa} />}
+      {tab === "employees" && <LeaveEmployees data={data} reload={reload} onWhatsApp={setWa} />}
+      {tab === "settings" && <LeaveSettingsTab data={data} reload={reload} />}
     </div>
   );
 }

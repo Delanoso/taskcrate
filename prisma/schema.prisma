@@ -44,6 +44,8 @@ model Organization {
   ohsaAudits     OhsaAudit[]
   leaveRequests  LeaveRequest[]
   leaveRules     LeaveLevelRule[]
+  leaveEmployees LeaveEmployee[]
+  leaveSettings  LeaveSettings?
   disciplineLogs DisciplineEntry[]
   onboardings    OnboardingPacket[]
   contracts      ContractDocument[]
@@ -402,8 +404,63 @@ model LeaveRequest {
   startDate      DateTime
   endDate        DateTime
   reason         String?
-  status         String       @default("pending") // pending|approved|auto_approved|blocked|rejected
+  status         String       @default("pending") // pending|approved|auto_approved|blocked|rejected|cancelled
   createdAt      DateTime     @default(now())
+  employeeId     String?
+  employee       LeaveEmployee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  leaveType      String       @default("annual")
+  days           Float?       // working days deducted; null on legacy requests
+  decidedAt      DateTime?
+  decidedBy      String?
+  decisionNote   String?
+  cancelledAt    DateTime?
+  capturedBy     String?      // set when an admin records leave on the employee's behalf
+
+  @@index([employeeId])
+}
+
+model LeaveEmployee {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  publicToken    String       @default(cuid())
+  fullName       String
+  employeeNumber String?
+  phone          String?
+  level          String       @default("Staff")
+  startDate      DateTime     // employment start; sick/family cycles run from here
+  annualDays     Float        @default(15) // working days per year, accrued monthly
+  balanceDate    DateTime     // opening balances are as at this date
+  openingAnnual  Float        @default(0)
+  openingSick    Float?       // null = full cycle entitlement
+  openingFamily  Float?
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  requests       LeaveRequest[]
+  adjustments    LeaveAdjustment[]
+
+  @@index([organizationId])
+  @@index([publicToken])
+}
+
+model LeaveAdjustment {
+  id         String        @id @default(cuid())
+  employeeId String
+  employee   LeaveEmployee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType  String
+  days       Float         // positive adds days, negative removes
+  note       String?
+  createdBy  String?
+  createdAt  DateTime      @default(now())
+
+  @@index([employeeId])
+}
+
+model LeaveSettings {
+  organizationId String       @id
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workDays       String       @default("12345") // ISO weekdays, 1 = Monday
+  allowNegative  Boolean      @default(false)
 }
 
 // ——— Discipline ———
