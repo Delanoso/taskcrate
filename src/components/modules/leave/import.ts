@@ -26,7 +26,7 @@ const HEADER_RULES: [RegExp, Key][] = [
   [/sick/, "openingSick"],
   [/family|frl/, "openingFamily"],
   [/annual|balance|leave days|days due|days owed/, "openingAnnual"],
-  [/start|engage|hire|employ|joined/, "startDate"],
+  [/start|engage|hire|employment|joined|commence/, "startDate"],
   [/level|grade|band|position|role/, "level"],
   [/name|employee/, "fullName"],
 ];
@@ -71,6 +71,12 @@ export function parseDate(raw: string): string | null {
   if (Number.isNaN(t)) return null;
   const d = new Date(t);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Excel drops the leading 0 from cellphone numbers typed as numbers (821234567 → 0821234567). */
+function cleanPhone(raw: string) {
+  const s = raw.trim();
+  return /^[6-8]\d{8}$/.test(s) ? `0${s}` : s || null;
 }
 
 const num = (raw: string) => {
@@ -130,7 +136,7 @@ export function parseEmployeeRows(input: string[][], balanceDate = todayKey()): 
     rows.push({
       fullName: name,
       employeeNumber: get("employeeNumber") || null,
-      phone: get("phone") || null,
+      phone: cleanPhone(get("phone")),
       level: get("level") || "Staff",
       startDate,
       monthlyAccrual: Math.round(monthly * 10000) / 10000,
