@@ -48,11 +48,12 @@ const SERVER: Record<string, ProductSandbox> = {
     screenTitle: "Near-miss board",
     subtitle: "Anonymous report",
     steps: [
+      { id: "scan", label: "Scan the QR poster" },
       { id: "photo", label: "Take hazard photo" },
       { id: "send", label: "Submit anonymously" },
     ],
-    successTitle: "State Transition Success",
-    successBody: "Report triaged · no identity stored.",
+    successTitle: "Report NM-00001 received",
+    successBody: "Safety team assigns an action · reporter tracks progress privately.",
   },
   "contractor-safety-file": {
     screenTitle: "Safety file",

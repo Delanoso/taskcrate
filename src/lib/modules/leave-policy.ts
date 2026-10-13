@@ -221,12 +221,7 @@ export function computeBalances(
 // ——— Phones & WhatsApp ———
 
 /** Digits in international format for wa.me — South African local numbers (0XX…) become 27XX…. */
-export function waPhone(phone: string | null | undefined) {
-  const digits = (phone ?? "").replace(/\D/g, "");
-  if (digits.length === 10 && digits.startsWith("0")) return `27${digits.slice(1)}`;
-  if (digits.length === 9 && /^[6-8]/.test(digits)) return `27${digits}`;
-  return digits;
-}
+export { waPhone } from "@/lib/phone";
 
 export const phoneKey = (phone: string | null | undefined) => (phone ?? "").replace(/\D/g, "").slice(-9);
 

@@ -2,43 +2,44 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireProductApi } from "@/lib/modules/api-guard";
+import { appUrl, companyName, jsonList, managersOnly, parseBody } from "@/lib/modules/common";
+import { SLUG, createReport, getBoard, reportInput, serializeReport } from "@/lib/modules/nearmiss-server";
 
 export async function GET() {
-  const gate = await requireProductApi("near-miss-whisperer");
+  const gate = await requireProductApi(SLUG);
   if ("error" in gate) return gate.error;
-  let board = await db.nearMissBoard.findUnique({
-    where: { organizationId: gate.session.organizationId },
-  });
-  if (!board) {
-    board = await db.nearMissBoard.create({
-      data: { organizationId: gate.session.organizationId },
-    });
-  }
-  const reports = await db.nearMissReport.findMany({
-    where: { organizationId: gate.session.organizationId },
-    orderBy: { createdAt: "desc" },
-  });
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3847";
+  const orgId = gate.session.organizationId;
+  const board = await getBoard(orgId);
+  const reports = await db.nearMissReport.findMany({ where: { organizationId: orgId }, orderBy: { createdAt: "desc" } });
   return NextResponse.json({
-    board,
-    reports,
-    publicUrl: `${appUrl}/p/nearmiss/${board.publicToken}`,
+    company: await companyName(orgId),
+    publicUrl: `${appUrl()}/p/nearmiss/${board.publicToken}`,
+    locations: jsonList(board.locationsJson),
+    canManage: gate.access.role !== "MEMBER",
+    reports: reports.map(serializeReport),
   });
 }
 
-export async function PATCH(req: Request) {
-  const gate = await requireProductApi("near-miss-whisperer");
+/** Staff log a report on someone's behalf (e.g. told verbally at a toolbox talk). */
+export async function POST(req: Request) {
+  const gate = await requireProductApi(SLUG);
   if ("error" in gate) return gate.error;
-  const body = z
-    .object({ id: z.string(), status: z.enum(["triaged", "closed"]) })
-    .parse(await req.json());
-  const report = await db.nearMissReport.findFirst({
-    where: { id: body.id, organizationId: gate.session.organizationId },
-  });
-  if (!report) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const updated = await db.nearMissReport.update({
-    where: { id: body.id },
-    data: { status: body.status },
-  });
-  return NextResponse.json({ report: updated });
+  const body = await parseBody(req, reportInput);
+  if ("error" in body) return body.error;
+  const report = await createReport(gate.session.organizationId, body.data);
+  return NextResponse.json({ report: serializeReport(report) });
+}
+
+/** Board settings: the list of areas shown on the public form. */
+export async function PUT(req: Request) {
+  const gate = await requireProductApi(SLUG);
+  if ("error" in gate) return gate.error;
+  const denied = managersOnly(gate.access, "change board settings");
+  if (denied) return denied;
+  const body = await parseBody(req, z.object({ locations: z.array(z.string().trim().min(1).max(80)).max(100) }));
+  if ("error" in body) return body.error;
+  const locations = [...new Set(body.data.locations)];
+  const board = await getBoard(gate.session.organizationId);
+  await db.nearMissBoard.update({ where: { id: board.id }, data: { locationsJson: JSON.stringify(locations) } });
+  return NextResponse.json({ locations });
 }

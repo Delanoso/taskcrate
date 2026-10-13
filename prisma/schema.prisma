@@ -304,17 +304,43 @@ model NearMissBoard {
   organizationId String       @unique
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   publicToken    String       @unique @default(cuid())
+  /// JSON array of area names offered on the public form
+  locationsJson  String       @default("[]")
 }
 
 model NearMissReport {
-  id             String       @id @default(cuid())
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  description    String
-  photoUrl       String?
-  locationHint   String?
-  status         String       @default("open") // open|triaged|closed
-  createdAt      DateTime     @default(now())
+  id                 String       @id @default(cuid())
+  organizationId     String
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reference          String?
+  /// Lets the anonymous reporter follow progress without an account
+  trackingToken      String?      @unique
+  reportType         String       @default("near_miss") // see src/lib/modules/nearmiss-options.ts
+  category           String?
+  potentialSeverity  String?      // low|medium|high|critical
+  description        String
+  immediateAction    String?
+  occurredAt         DateTime?
+  /// Legacy single photo; new reports use photosJson
+  photoUrl           String?
+  photosJson         String       @default("[]")
+  locationHint       String?
+  reporterName       String?
+  reporterContact    String?
+  status             String       @default("open") // open|triaged|closed
+  riskRating         String?      // low|medium|high|critical
+  assignedTo         String?
+  correctiveAction   String?
+  dueDate            DateTime?
+  feedback           String?
+  triagedAt          DateTime?
+  closedAt           DateTime?
+  closedBy           String?
+  closeOutNote       String?
+  closeOutPhotosJson String       @default("[]")
+  createdAt          DateTime     @default(now())
+
+  @@index([organizationId, createdAt])
 }
 
 // ——— Contractor Safety File ———
