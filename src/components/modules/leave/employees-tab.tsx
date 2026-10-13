@@ -4,7 +4,8 @@ import { useState } from "react";
 import { Download, FileUp, MessageCircle, Plus } from "lucide-react";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, LinkBox, jsonFetch } from "@/components/modules/ui-bits";
 import { LeaveStatus, selectClass } from "@/components/modules/leave/request-form";
-import { IMPORT_COLUMNS, parseEmployeeSheet, templateCsv, type ImportResult } from "@/components/modules/leave/import";
+import { DEFAULT_MONTHLY_ACCRUAL, IMPORT_COLUMNS, parseEmployeeRows, textToRows, type ImportResult } from "@/components/modules/leave/import";
+import { readXlsx } from "@/lib/xlsx-read";
 import { fmtDays, fmtLeaveRange, leaveTypeLabel, todayKey, waPhone } from "@/lib/modules/leave-policy";
 import type { Employee, LeaveData, WaPrompt } from "@/components/modules/leave/types";
 
@@ -38,9 +39,9 @@ export function LeaveEmployees({ data, reload, onWhatsApp }: Props) {
   const current = panel && "id" in panel ? data.employees.find((e) => e.id === panel.id) : undefined;
 
   function exportCsv() {
-    const header = ["Name", "Employee number", "Cellphone", "Level", "Start date", "Annual days per year", "Annual available", "Annual pending", "Sick available", "Family available", "Active"];
+    const header = ["Name", "Employee number", "Cellphone", "Level", "Start date", "Days added per month", "Annual available", "Annual pending", "Sick available", "Family available", "Active"];
     const rows = data.employees.map((e) => [
-      e.fullName, e.employeeNumber, e.phone, e.level, dateOnly(e.startDate), e.annualDays,
+      e.fullName, e.employeeNumber, e.phone, e.level, dateOnly(e.startDate), e.balances.annual.monthlyAccrual,
       e.balances.annual.available, e.balances.annual.pending, e.balances.sick.available, e.balances.family.available, e.active ? "Yes" : "No",
     ]);
     download(`leave-balances-${todayKey()}.csv`, [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\n"));
@@ -136,7 +137,7 @@ function EmployeeForm({ data, employee, onDone }: { data: LeaveData; employee?: 
     phone: employee?.phone ?? "",
     level: employee?.level ?? data.rules[0]?.levelName ?? "Staff",
     startDate: employee ? dateOnly(employee.startDate) : "",
-    annualDays: String(employee?.annualDays ?? 15),
+    monthlyAccrual: String(employee ? Math.round((employee.annualDays / 12) * 10000) / 10000 : DEFAULT_MONTHLY_ACCRUAL),
     balanceDate: employee ? dateOnly(employee.balanceDate) : todayKey(),
     openingAnnual: String(employee?.openingAnnual ?? 0),
     openingSick: employee?.openingSick?.toString() ?? "",
@@ -154,7 +155,7 @@ function EmployeeForm({ data, employee, onDone }: { data: LeaveData; employee?: 
     try {
       const d = await jsonFetch(employee ? `/api/modules/leave/employees/${employee.id}` : "/api/modules/leave/employees", {
         method: employee ? "PATCH" : "POST",
-        body: JSON.stringify(f),
+        body: JSON.stringify({ ...f, annualDays: Math.round(Number(f.monthlyAccrual) * 12 * 10000) / 10000 }),
       });
       await onDone(d.employee?.id);
     } catch (err) {
@@ -185,9 +186,12 @@ function EmployeeForm({ data, employee, onDone }: { data: LeaveData; employee?: 
             <div className="space-y-1.5"><Label htmlFor="startDate">Employment start date</Label><Input id="startDate" type="date" required value={f.startDate} onChange={set("startDate")} /></div>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="annualDays">Annual leave days per year</Label>
-            <Input id="annualDays" type="number" min={0} max={60} step="0.5" required value={f.annualDays} onChange={set("annualDays")} />
-            <p className="text-xs text-muted-foreground">BCEA minimum is 15 working days (5-day week). Accrues monthly.</p>
+            <Label htmlFor="monthlyAccrual">Annual leave days added per month</Label>
+            <Input id="monthlyAccrual" type="number" min={0} max={5} step="any" required value={f.monthlyAccrual} onChange={set("monthlyAccrual")} />
+            <p className="text-xs text-muted-foreground">
+              {Number(f.monthlyAccrual) > 0 ? `= ${Math.round(Number(f.monthlyAccrual) * 12 * 100) / 100} days a year. ` : ""}
+              BCEA minimum is 1.25 a month (15 days a year on a 5-day week).
+            </p>
           </div>
           <fieldset className="space-y-3 rounded-md border p-3">
             <legend className="px-1 text-xs font-medium">Opening balances</legend>
@@ -211,23 +215,28 @@ function EmployeeForm({ data, employee, onDone }: { data: LeaveData; employee?: 
 }
 
 function ImportPanel({ onDone }: { onDone: () => Promise<void> }) {
+  const [sheet, setSheet] = useState<{ name: string; rows: string[][] } | null>(null);
   const [text, setText] = useState("");
+  const [showPaste, setShowPaste] = useState(false);
   const [balanceDate, setBalanceDate] = useState(todayKey());
-  const [preview, setPreview] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string[] | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  function check(t = text) {
-    setResult(null);
-    setError(null);
-    setPreview(t.trim() ? parseEmployeeSheet(t, balanceDate) : null);
-  }
+  const source = sheet?.rows ?? (text.trim() ? textToRows(text) : null);
+  const preview: ImportResult | null = source ? parseEmployeeRows(source, balanceDate) : null;
 
   async function onFile(file: File) {
-    const t = await file.text();
-    setText(t);
-    check(t);
+    setResult(null);
+    setError(null);
+    try {
+      const rows = /\.(csv|txt)$/i.test(file.name) ? textToRows(await file.text()) : await readXlsx(file);
+      setSheet({ name: file.name, rows });
+      setText("");
+    } catch (err) {
+      setSheet(null);
+      setError([err instanceof Error ? err.message : "Could not read that file"]);
+    }
   }
 
   async function submit() {
@@ -236,12 +245,13 @@ function ImportPanel({ onDone }: { onDone: () => Promise<void> }) {
     setError(null);
     try {
       const d = await jsonFetch("/api/modules/leave/employees", { method: "PUT", body: JSON.stringify({ rows: preview.rows }) });
-      setResult(`${d.created} added, ${d.updated} updated.`);
+      setResult(`Done — ${d.created} added, ${d.updated} updated.`);
+      setSheet(null);
       setText("");
-      setPreview(null);
       await onDone();
     } catch (err) {
-      setError([err instanceof Error ? err.message : "Import failed"]);
+      const body = err instanceof Error ? err.message : "Import failed";
+      setError([body]);
     } finally {
       setBusy(false);
     }
@@ -250,54 +260,68 @@ function ImportPanel({ onDone }: { onDone: () => Promise<void> }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Import employees</CardTitle>
+        <CardTitle>Import employees from Excel</CardTitle>
         <CardDescription>
-          Copy the rows from Excel (including the heading row) and paste them below, or upload a CSV file. Columns:{" "}
-          {IMPORT_COLUMNS.map((c) => c.label).join(", ")}. Only name and start date are required. Existing employees (same number or name) are updated.
+          Upload a spreadsheet with one employee per row and a heading row. Columns: {IMPORT_COLUMNS.map((c) => c.label).join(", ")}.
+          Only name and start date are required — days per month defaults to {DEFAULT_MONTHLY_ACCRUAL}. Employees already loaded
+          (same employee number or name) are updated.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={() => download("leave-employees-template.csv", templateCsv())}>
-            <Download className="size-4" /> Template
-          </Button>
-          <Button asChild size="sm" variant="outline">
-            <label className="cursor-pointer">
-              <FileUp className="size-4" /> Upload CSV
-              <input type="file" accept=".csv,.txt,text/csv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ""; }} />
-            </label>
-          </Button>
+        <label className="flex cursor-pointer flex-col items-center gap-1 rounded-lg border-2 border-dashed p-5 text-center text-sm hover:bg-muted/50">
+          <FileUp className="size-6 text-muted-foreground" />
+          <span className="font-medium">{sheet ? sheet.name : "Choose Excel file (.xlsx) or CSV"}</span>
+          <span className="text-xs text-muted-foreground">{sheet ? "Click to choose a different file" : "The first sheet in the workbook is used"}</span>
+          <input
+            type="file"
+            accept=".xlsx,.csv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ""; }}
+          />
+        </label>
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <a href="/api/modules/leave/template" className="flex items-center gap-1 text-primary underline">
+            <Download className="size-4" /> Download Excel template
+          </a>
+          <button type="button" className="text-muted-foreground underline" onClick={() => setShowPaste((s) => !s)}>
+            {showPaste ? "Hide paste box" : "Or paste cells instead"}
+          </button>
         </div>
-        <textarea
-          value={text}
-          onChange={(e) => { setText(e.target.value); check(e.target.value); }}
-          rows={7}
-          placeholder={"Name\tEmployee number\tCellphone\tLevel\tStart date\tAnnual days per year\tAnnual leave balance\nSipho Ndlovu\tE001\t082 123 4567\tStaff\t2022-03-01\t15\t8.5"}
-          className="w-full rounded-md border bg-background px-2.5 py-1.5 font-mono text-xs"
-        />
+        {showPaste && (
+          <textarea
+            value={text}
+            onChange={(e) => { setText(e.target.value); setSheet(null); setResult(null); }}
+            rows={6}
+            placeholder={"Name\tEmployee number\tCellphone\tLevel\tStart date\tDays added per month\tAnnual leave balance\nSipho Ndlovu\tE001\t082 123 4567\tStaff\t2022-03-01\t1.25\t8.5"}
+            className="w-full rounded-md border bg-background px-2.5 py-1.5 font-mono text-xs"
+          />
+        )}
         <div className="space-y-1.5">
-          <Label htmlFor="importBalanceDate">Balances are as at</Label>
-          <Input id="importBalanceDate" type="date" value={balanceDate} onChange={(e) => { setBalanceDate(e.target.value); setPreview(text.trim() ? parseEmployeeSheet(text, e.target.value) : null); }} />
-          <p className="text-xs text-muted-foreground">Leave from this date onward is deducted, and accrual starts from here.</p>
+          <Label htmlFor="importBalanceDate">Balances in the sheet are as at</Label>
+          <Input id="importBalanceDate" type="date" value={balanceDate} onChange={(e) => setBalanceDate(e.target.value)} />
+          <p className="text-xs text-muted-foreground">
+            Days are added every month from this date, and leave taken from this date onward is deducted. A &ldquo;Balance date&rdquo;
+            column in the sheet overrides this per employee.
+          </p>
         </div>
 
         {preview && preview.errors.length > 0 && (
           <ul className="list-disc space-y-0.5 pl-5 text-xs text-destructive">{preview.errors.slice(0, 10).map((e) => <li key={e}>{e}</li>)}</ul>
         )}
         {preview && preview.rows.length > 0 && preview.errors.length === 0 && (
-          <div className="max-h-64 overflow-auto rounded-md border">
+          <div className="max-h-72 overflow-auto rounded-md border">
             <table className="w-full text-xs">
               <thead className="sticky top-0 bg-muted">
                 <tr className="text-left">
-                  <th className="p-1.5">Name</th><th className="p-1.5">Phone</th><th className="p-1.5">Start</th>
-                  <th className="p-1.5 text-right">Days/yr</th><th className="p-1.5 text-right">Annual</th><th className="p-1.5 text-right">Sick</th><th className="p-1.5 text-right">Family</th>
+                  <th className="p-1.5">Name</th><th className="p-1.5">Phone</th><th className="p-1.5">Level</th><th className="p-1.5">Start</th>
+                  <th className="p-1.5 text-right">Per month</th><th className="p-1.5 text-right">Annual</th><th className="p-1.5 text-right">Sick</th><th className="p-1.5 text-right">Family</th>
                 </tr>
               </thead>
               <tbody>
                 {preview.rows.map((r, i) => (
                   <tr key={i} className="border-t">
-                    <td className="p-1.5">{r.fullName}</td><td className="p-1.5">{r.phone ?? "–"}</td><td className="p-1.5">{r.startDate}</td>
-                    <td className="p-1.5 text-right">{r.annualDays}</td><td className="p-1.5 text-right">{r.openingAnnual}</td>
+                    <td className="p-1.5">{r.fullName}</td><td className="p-1.5">{r.phone ?? "–"}</td><td className="p-1.5">{r.level}</td><td className="p-1.5">{r.startDate}</td>
+                    <td className="p-1.5 text-right">{r.monthlyAccrual}</td><td className="p-1.5 text-right">{r.openingAnnual}</td>
                     <td className="p-1.5 text-right">{r.openingSick ?? "full"}</td><td className="p-1.5 text-right">{r.openingFamily ?? "full"}</td>
                   </tr>
                 ))}
@@ -364,7 +388,7 @@ function EmployeeDetail({
             <CardTitle>{e.fullName}</CardTitle>
             <CardDescription>
               {[e.employeeNumber, e.level, e.phone].filter(Boolean).join(" · ")}
-              <br />Started {new Date(e.startDate).toLocaleDateString("en-ZA", { timeZone: "UTC" })} · {e.annualDays} annual days a year
+              <br />Started {new Date(e.startDate).toLocaleDateString("en-ZA", { timeZone: "UTC" })} · {e.balances.annual.monthlyAccrual} days added per month
             </CardDescription>
           </div>
           <Button size="sm" variant="ghost" onClick={onClose}>Close</Button>
