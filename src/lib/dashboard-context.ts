@@ -9,13 +9,15 @@ export async function requireDashboardContext() {
   if (!session) redirect("/login");
 
   const [org, user, access] = await Promise.all([
-    db.organization.findUniqueOrThrow({
+    db.organization.findUnique({
       where: { id: session.organizationId },
       include: { branding: true },
     }),
-    db.user.findUniqueOrThrow({ where: { id: session.userId } }),
-    getAccessContext(session),
+    db.user.findUnique({ where: { id: session.userId } }),
+    getAccessContext(session).catch(() => null),
   ]);
+  // Valid token but the user, company or membership is gone (removed from the team, account deleted).
+  if (!org || !user || !access) redirect("/login");
 
   return { session, org, user, access };
 }

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Download, Search } from "lucide-react";
 import { Button, Input } from "@/components/modules/ui-bits";
 import { DocDetail } from "@/components/modules/contract/doc-detail";
-import { Pill, STATUS_TONE, fmtDate, selectClass, type ContractData, type ContractDoc } from "@/components/modules/contract/types";
+import { Pill, STATUS_TONE, fmtDate, type ContractData, type ContractDoc } from "@/components/modules/contract/types";
 import { STATUS_LABEL } from "@/lib/modules/contract-library";
 
 const FILTERS = [
@@ -75,7 +75,7 @@ export function DocumentsTab({
           <Search className="absolute left-2 top-2.5 size-4 text-muted-foreground" />
           <Input className="pl-8" placeholder="Search name, number, document, reference…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
-        <select className={`${selectClass} w-auto`} value={template} onChange={(e) => setTemplate(e.target.value)} aria-label="Template">
+        <select className="h-9 max-w-64 rounded-md border bg-background px-2 text-sm" value={template} onChange={(e) => setTemplate(e.target.value)} aria-label="Template">
           <option value="all">All documents</option>
           {data.templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           <option value="none">One-off documents</option>
