@@ -1,76 +1,86 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { db } from "@/lib/db";
-import { saveDataUrlUpload } from "@/lib/uploads";
+import { parseRequirements, resolveItem } from "@/lib/modules/safety-file-items";
+import { documentSelect, safetyFileView } from "@/lib/modules/safety-file-server";
+import { saveSafetyFileDocument } from "@/lib/safety-file-storage";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const item = await db.contractorProfile.findUnique({
     where: { publicToken: token },
-    include: { documents: true, organization: { include: { branding: true } } },
+    include: { documents: { select: documentSelect }, organization: { include: { branding: true } } },
   });
   if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({
     contractor: {
       companyName: item.companyName,
-      status: item.status,
-      documents: item.documents,
       hostCompany: item.organization.branding?.displayName ?? item.organization.name,
+      ...(await safetyFileView(item)),
     },
   });
 }
 
+/** One file per request (multipart: docType, file, expiresAt?) so each stays under the upload limit. */
 export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const item = await db.contractorProfile.findUnique({ where: { publicToken: token } });
-  if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const body = z.object({
-    docType: z.enum(["coida", "liability", "medical"]),
-    fileDataUrl: z.string().startsWith("data:"),
-    expiresAt: z.string().optional(),
-  }).parse(await req.json());
-  const fileUrl = await saveDataUrlUpload(body.fileDataUrl.includes("image/") ? body.fileDataUrl : body.fileDataUrl.replace(/^data:[^;]+/, "data:image/png"), `contractor/${item.organizationId}`).catch(async () => {
-    // allow non-image PDFs stored as generic base64 text file
-    const match = /^data:([^;]+);base64,(.+)$/.exec(body.fileDataUrl);
-    if (!match) throw new Error("bad file");
-    const { mkdir, writeFile } = await import("fs/promises");
-    const path = await import("path");
-    const { randomBytes } = await import("crypto");
-    const dir = path.join(process.cwd(), "public", "uploads", `contractor/${item.organizationId}`);
-    await mkdir(dir, { recursive: true });
-    const name = `${Date.now()}-${randomBytes(4).toString("hex")}.bin`;
-    await writeFile(path.join(dir, name), Buffer.from(match[2], "base64"));
-    return `/uploads/contractor/${item.organizationId}/${name}`;
+  const profile = await db.contractorProfile.findUnique({ where: { publicToken: token } });
+  if (!profile) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  let fd: FormData;
+  try {
+    fd = await req.formData();
+  } catch {
+    return NextResponse.json({ error: "Upload failed — please try again." }, { status: 400 });
+  }
+  const docType = String(fd.get("docType") ?? "");
+  const file = fd.get("file");
+  const expiresRaw = String(fd.get("expiresAt") ?? "").trim();
+
+  if (!parseRequirements(profile.requirementsJson).includes(docType)) {
+    return NextResponse.json({ error: "This document is not on your required list." }, { status: 400 });
+  }
+  if (!(file instanceof File) || file.size === 0) {
+    return NextResponse.json({ error: "Choose a file to upload." }, { status: 400 });
+  }
+  const item = resolveItem(docType);
+  let expiresAt: Date | null = null;
+  if (expiresRaw) {
+    expiresAt = new Date(`${expiresRaw}T23:59:59+02:00`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(expiresRaw) || Number.isNaN(expiresAt.getTime())) {
+      return NextResponse.json({ error: "Enter a valid expiry date." }, { status: 400 });
+    }
+  } else if (item.expires) {
+    return NextResponse.json({ error: `Enter the expiry date for ${item.label}.` }, { status: 400 });
+  }
+
+  let saved;
+  try {
+    saved = await saveSafetyFileDocument(file, profile.organizationId);
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Upload failed" }, { status: 400 });
+  }
+
+  const doc = await db.contractorDocument.create({
+    data: { contractorId: profile.id, docType, expiresAt, ...saved },
+    select: documentSelect,
   });
-  await db.contractorDocument.create({
-    data: {
-      contractorId: item.id,
-      docType: body.docType,
-      fileUrl,
-      expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
-    },
-  });
-  const docs = await db.contractorDocument.findMany({ where: { contractorId: item.id } });
-  const now = new Date();
-  const required = ["coida", "liability", "medical"];
-  const ok = required.every((t) => {
-    const d = docs.find((x) => x.docType === t);
-    return d && (!d.expiresAt || d.expiresAt >= now);
-  });
-  await db.contractorProfile.update({
-    where: { id: item.id },
-    data: { status: ok ? "active" : "pending" },
-  });
-  if (body.expiresAt) {
+
+  if (expiresAt) {
     await db.notification.create({
       data: {
-        organizationId: item.organizationId,
+        organizationId: profile.organizationId,
         productSlug: "contractor-safety-file",
-        title: "Contractor document expiry tracked",
-        body: `${item.companyName} uploaded ${body.docType} expiring ${body.expiresAt}`,
-        dueAt: new Date(body.expiresAt),
+        title: `${profile.companyName}: ${item.label} expires`,
+        body: `${profile.companyName} uploaded ${item.label} expiring ${expiresRaw}.`,
+        dueAt: expiresAt,
       },
     });
   }
-  return NextResponse.json({ ok: true });
+
+  const fresh = await db.contractorProfile.findUniqueOrThrow({
+    where: { id: profile.id },
+    include: { documents: { select: documentSelect } },
+  });
+  const view = await safetyFileView(fresh);
+  return NextResponse.json({ ok: true, document: doc, status: view.status });
 }

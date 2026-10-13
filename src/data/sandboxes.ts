@@ -44,16 +44,6 @@ const SERVER: Record<string, ProductSandbox> = {
     successTitle: "State Transition Success",
     successBody: "Visitor archived · protocol delivery logged.",
   },
-  "asset-precheck": {
-    screenTitle: "Machine pre-check",
-    subtitle: "Scan asset QR",
-    steps: [
-      { id: "c1", label: "Pass 5-point checklist" },
-      { id: "pass", label: "Unlock shift pass" },
-    ],
-    successTitle: "State Transition Success",
-    successBody: "Operational pass token issued for this shift.",
-  },
   "near-miss-whisperer": {
     screenTitle: "Near-miss board",
     subtitle: "Anonymous report",

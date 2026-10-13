@@ -321,8 +321,11 @@ model ContractorProfile {
   organizationId String
   organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   companyName    String
+  contactName    String?
   contactEmail   String?
   contactPhone   String?
+  /// JSON array of item keys from src/lib/modules/safety-file-items.ts ("custom:<label>" for extras)
+  requirementsJson String            @default("[]")
   publicToken    String              @unique @default(cuid())
   status         String              @default("pending") // pending|active|blocked
   createdAt      DateTime            @default(now())
@@ -333,8 +336,11 @@ model ContractorDocument {
   id           String            @id @default(cuid())
   contractorId String
   contractor   ContractorProfile @relation(fields: [contractorId], references: [id], onDelete: Cascade)
-  docType      String // coida|liability|medical
+  docType      String // requirement item key
   fileUrl      String
+  fileName     String?
+  mimeType     String?
+  sizeBytes    Int?
   expiresAt    DateTime?
   uploadedAt   DateTime          @default(now())
 }
