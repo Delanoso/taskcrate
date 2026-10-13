@@ -61,13 +61,14 @@ export function IssueDetail({ id, data, reload, go, onClose }: { id: string; dat
   const waSign = waLink(x.employeePhone, custodyInvite(data.company, x.employeeName, x.signingUrl, d.batch.filter((b) => b.status === "awaiting_signature").length, x.reminderCount > 0));
   const waReturn = waLink(x.employeePhone, `Hi ${x.employeeName.split(" ")[0]}, ${me.itemName}${me.assetTag ? ` (${me.assetTag})` : ""} was due back on ${fmtDate(x.dueBackAt)}. Please return it to ${data.company} as soon as possible.`);
 
+  const issued = { at: x.issuedAt, text: `Issued by ${x.issuedBy ?? "staff"} in ${label(CONDITIONS, x.conditionOut).toLowerCase()} condition` };
   const events = [
-    { at: x.issuedAt, text: `Issued by ${x.issuedBy ?? "staff"} in ${label(CONDITIONS, x.conditionOut).toLowerCase()} condition` },
     x.signedAt && { at: x.signedAt, text: `Signed by ${x.signerName} ${x.signMethod === "link" ? `via link${x.signIp ? ` from ${x.signIp}` : ""}` : "in person"}` },
     x.lastRemindedAt && { at: x.lastRemindedAt, text: `Reminder sent (${x.reminderCount})` },
     x.returnedAt && x.status === "cancelled" && { at: x.returnedAt, text: `Cancelled by ${x.receivedBy}: ${x.cancelReason}` },
     x.returnedAt && x.status !== "cancelled" && { at: x.returnedAt, text: `${x.status === "lost" ? "Closed as lost" : "Checked in"} by ${x.receivedBy} · ${label(OUTCOMES, x.outcome)}` },
   ].filter((e): e is { at: string; text: string } => !!e).sort((a, b) => a.at.localeCompare(b.at));
+  events.unshift(issued);
 
   return (
     <Panel onClose={onClose}>

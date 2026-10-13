@@ -26,6 +26,7 @@ function table(doc: Doc, cols: { label: string; w: number }[], rows: string[][])
 }
 
 const tagOf = (i: EquipmentItem) => i.assetTag ?? "-";
+const short = (condition: string) => label(CONDITIONS, condition).split(" ")[0];
 
 export async function buildCustodyPdf(issues: IssueWithItem[]) {
   const first = issues[0];
@@ -98,7 +99,7 @@ export async function buildHandbackPdf(issues: IssueWithItem[]) {
     doc.heading(`${x.item.name}${x.item.assetTag ? ` (${x.item.assetTag})` : ""}`, 10);
     doc.field("Issued", `${fmtDate(x.createdAt)} in ${label(CONDITIONS, x.conditionOut).toLowerCase()} condition`);
     const checks = readChecklist(x.checklistJson);
-    for (const c of CHECKLIST) doc.field(c.label, x.outcome === "lost" ? "n/a" : checks[c.key] ? "Yes" : "No", 260);
+    if (x.outcome !== "lost" && Object.keys(checks).length) for (const c of CHECKLIST) doc.field(c.label, checks[c.key] ? "Yes" : "No", 260);
     if (x.damageNotes) doc.field("Damage / findings", x.damageNotes);
     if (x.repairCost) doc.field("Estimated cost", money(x.repairCost));
     doc.field("Outcome", label(OUTCOMES, x.outcome));
@@ -110,11 +111,14 @@ export async function buildHandbackPdf(issues: IssueWithItem[]) {
     }
   }
 
+  doc.ensure(190);
   doc.heading("Acknowledgement");
   doc.paragraph(
     first.employeePresent
       ? "The employee was present at the inspection and confirms that the condition recorded above is correct."
-      : "The employee was not present at the inspection. A copy of this report must be given to the employee, who may respond in writing.",
+      : issues.every((x) => x.outcome === "lost")
+        ? "The equipment above was reported lost or not returned. A copy of this report must be given to the employee, who may respond in writing."
+        : "The employee was not present at the inspection. A copy of this report must be given to the employee, who may respond in writing.",
     { size: 9 },
   );
   doc.y -= 6;
@@ -122,7 +126,7 @@ export async function buildHandbackPdf(issues: IssueWithItem[]) {
     first.employeePresent
       ? { label: "Employee", name: first.returnSignerName ?? first.employeeName, date: first.returnedAt, url: first.returnSignatureUrl }
       : { label: "Employee", name: first.employeeName, note: "Not present" },
-    { label: "Inspected by", name: first.receivedBy, date: first.returnedAt, url: first.inspectorSignature },
+    { label: first.inspectorSignature ? "Inspected by" : "Recorded by", name: first.receivedBy, date: first.returnedAt, url: first.inspectorSignature },
   ]);
   return doc.finish();
 }
@@ -140,19 +144,23 @@ export async function buildItemHistoryPdf(item: EquipmentItem, issues: Equipment
   doc.field("Location", item.location);
   doc.field("Added", fmtDate(item.createdAt));
   if (item.notes) doc.field("Notes", item.notes);
+  if (item.photoUrl) {
+    doc.y -= 4;
+    await doc.imageRow([item.photoUrl], 120);
+  }
 
   doc.heading("Custody history");
   if (!issues.length && !logs.length) doc.paragraph("Never issued.", { color: doc.muted });
   if (issues.length) {
     table(
       doc,
-      [{ label: "Document", w: 70 }, { label: "Holder", w: 0 }, { label: "Out", w: 62 }, { label: "Back", w: 62 }, { label: "Condition", w: 80 }, { label: "Status", w: 85 }],
+      [{ label: "Document", w: 66 }, { label: "Holder", w: 0 }, { label: "Out", w: 60 }, { label: "Back", w: 60 }, { label: "Condition", w: 100 }, { label: "Status", w: 80 }],
       issues.map((x) => [
         x.documentNumber,
         x.employeeName,
         fmtDate(x.createdAt),
         x.returnedAt ? fmtDate(x.returnedAt) : "-",
-        `${label(CONDITIONS, x.conditionOut)}${x.conditionIn ? ` > ${label(CONDITIONS, x.conditionIn)}` : ""}`,
+        `${short(x.conditionOut)}${x.conditionIn ? ` > ${short(x.conditionIn)}` : ""}`,
         ISSUE_STATUS[x.status as keyof typeof ISSUE_STATUS] ?? x.status,
       ]),
     );
