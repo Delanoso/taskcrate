@@ -68,11 +68,11 @@ const SERVER: Record<string, ProductSandbox> = {
     screenTitle: "OHSA walkthrough",
     subtitle: "Safety rep wizard",
     steps: [
-      { id: "exit", label: "Confirm exits clear + photo" },
-      { id: "score", label: "Generate health score" },
+      { id: "exit", label: "Emergency exits clear? Yes + photo" },
+      { id: "score", label: "Complete audit" },
     ],
     successTitle: "State Transition Success",
-    successBody: "Audit completed · weighted score 92%.",
+    successBody: "Audit completed · compliance 92% · findings report ready.",
   },
   "leave-planner": {
     screenTitle: "Leave request",

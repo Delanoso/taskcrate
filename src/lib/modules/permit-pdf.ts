@@ -1,14 +1,15 @@
-import { readFile } from "fs/promises";
-import path from "path";
-import {
-  PDFDocument,
-  rgb,
-  StandardFonts,
-  type PDFFont,
-  type PDFImage,
-  type PDFPage,
-} from "pdf-lib";
+import { PDFDocument, rgb, StandardFonts, type PDFPage } from "pdf-lib";
 import { db } from "@/lib/db";
+import {
+  embedImage,
+  fit,
+  fmtDate,
+  fmtDateTime,
+  hex,
+  nextDocumentNumber,
+  safe,
+  wrap,
+} from "@/lib/modules/pdf-kit";
 import {
   labelKeys,
   parseJsonKeys,
@@ -55,15 +56,9 @@ const PAGE_H = 842;
 const MARGIN = 48;
 const HEADER_H = 72;
 const FOOTER_TOP = 64;
-const TIME_ZONE = "Africa/Johannesburg";
 
-export async function nextPermitDocumentNumber(organizationId: string) {
-  const seq = await db.documentSequence.upsert({
-    where: { organizationId_prefix: { organizationId, prefix: "PTW" } },
-    create: { organizationId, prefix: "PTW", nextNumber: 2 },
-    update: { nextNumber: { increment: 1 } },
-  });
-  return `PTW-${String(seq.nextNumber - 1).padStart(5, "0")}`;
+export function nextPermitDocumentNumber(organizationId: string) {
+  return nextDocumentNumber(organizationId, "PTW");
 }
 
 export async function buildPermitClosedPdf(permit: PermitForPdf) {
@@ -359,83 +354,4 @@ export async function buildPermitClosedPdf(permit: PermitForPdf) {
   }
 
   return { bytes: await pdf.save(), documentNumber: docNum };
-}
-
-/** Loads a PNG/JPEG from a data URL or a /uploads path; other formats are skipped. */
-async function embedImage(pdf: PDFDocument, url?: string | null): Promise<PDFImage | null> {
-  if (!url) return null;
-  try {
-    let bytes: Buffer;
-    const m = /^data:image\/[\w.+-]+;base64,(.+)$/.exec(url);
-    if (m) {
-      bytes = Buffer.from(m[1], "base64");
-    } else if (url.startsWith("/uploads/")) {
-      const publicDir = path.join(process.cwd(), "public");
-      const filePath = path.join(publicDir, url);
-      if (!filePath.startsWith(publicDir + path.sep)) return null;
-      bytes = await readFile(filePath);
-    } else {
-      return null;
-    }
-    if (bytes[0] === 0x89 && bytes[1] === 0x50) return await pdf.embedPng(bytes);
-    if (bytes[0] === 0xff && bytes[1] === 0xd8) return await pdf.embedJpg(bytes);
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-/** Standard PDF fonts only cover WinAnsi; drop anything else (emoji, arrows, etc). */
-function safe(text: string) {
-  return text
-    .replace(/[\u2018\u2019]/g, "'")
-    .replace(/[\u201C\u201D]/g, '"')
-    .replace(/[\u2013\u2014]/g, "-")
-    .replace(/\r?\n/g, " ")
-    .replace(/[^\x20-\x7E\xA0-\xFF]/g, "");
-}
-
-function wrap(text: string, font: PDFFont, size: number, maxWidth: number) {
-  const words = text.split(/\s+/).filter(Boolean);
-  const lines: string[] = [];
-  let cur = "";
-  for (const w of words) {
-    const next = cur ? `${cur} ${w}` : w;
-    if (font.widthOfTextAtSize(next, size) > maxWidth && cur) {
-      lines.push(cur);
-      cur = w;
-    } else {
-      cur = next;
-    }
-  }
-  if (cur) lines.push(cur);
-  return lines.length ? lines : ["-"];
-}
-
-function fit(text: string, font: PDFFont, size: number, maxWidth: number) {
-  if (font.widthOfTextAtSize(text, size) <= maxWidth) return text;
-  let t = text;
-  while (t.length > 1 && font.widthOfTextAtSize(`${t}...`, size) > maxWidth) t = t.slice(0, -1);
-  return `${t}...`;
-}
-
-function fmtDate(d: Date) {
-  return d.toLocaleDateString("en-ZA", { timeZone: TIME_ZONE });
-}
-
-function fmtDateTime(d: Date) {
-  return d.toLocaleString("en-ZA", {
-    timeZone: TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function hex(h: string) {
-  const n = parseInt(h.replace("#", ""), 16);
-  if (Number.isNaN(n)) return { r: 0.12, g: 0.23, b: 0.37 };
-  return { r: ((n >> 16) & 255) / 255, g: ((n >> 8) & 255) / 255, b: (n & 255) / 255 };
 }

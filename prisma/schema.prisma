@@ -352,11 +352,32 @@ model OhsaAudit {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   title          String
   monthLabel     String
+  /// Legacy 8-item checklist answers; new audits use OhsaAuditAnswer rows
   answersJson    String       @default("[]")
+  /// Compliance %: yes / (yes + no)
   score          Float?
-  status         String       @default("in_progress")
+  status         String       @default("in_progress") // in_progress|completed
+  auditorName    String?
+  documentNumber String?
+  completedAt    DateTime?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+  answers        OhsaAuditAnswer[]
+}
+
+model OhsaAuditAnswer {
+  id         String    @id @default(cuid())
+  auditId    String
+  audit      OhsaAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  /// Question id from src/lib/modules/ohsa-audit-items.ts, e.g. "1.1.2.c"
+  questionId String
+  answer     String?   // yes|no|na
+  note       String?
+  /// JSON array of /uploads/ohsa/<orgId>/... photo URLs
+  photosJson String    @default("[]")
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([auditId, questionId])
 }
 
 // ——— Leave Planner ———

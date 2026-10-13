@@ -122,17 +122,17 @@ export const PRODUCTS: ProductDefinition[] = [
   {
     slug: "ohsa-mock-auditor",
     name: "OHSA Statutory Mock-Auditor",
-    tagline: "Monthly inspection wizard with photo proof and a health score.",
+    tagline: "Full health & safety audit with Yes/No answers and photo proof.",
     description:
-      "Structured checklist aligned to Department of Labour guidelines. Force photo evidence and generate a weighted safety health score for the safety rep.",
+      "A complete OHS Act audit — appointments, risk assessments, training, inspection registers and a site walk-through. Answer Yes, No or N/A, attach photos and notes, and get a findings report PDF.",
     category: "Health & Safety",
     priceMonthlyZar: 1000,
     priceMonthlyUsd: 54,
     features: [
-      "Inspection wizard",
-      "Mandatory photo evidence",
-      "Weighted safety score",
-      "Monthly compliance PDF",
+      "Full OHS audit checklist",
+      "Photo evidence per question",
+      "Compliance % and findings list",
+      "Audit report PDF",
     ],
     hasPdfExport: true,
     hasSignatures: true,
