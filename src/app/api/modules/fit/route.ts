@@ -8,6 +8,7 @@ export async function GET() {
   if ("error" in gate) return gate.error;
   const sites = await db.fitForDutySite.findMany({
     where: { organizationId: gate.session.organizationId },
+    orderBy: { createdAt: "desc" },
     include: { checks: { orderBy: { createdAt: "desc" }, take: 40 } },
   });
   return NextResponse.json({ sites });

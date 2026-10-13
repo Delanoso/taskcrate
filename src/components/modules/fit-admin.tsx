@@ -5,10 +5,14 @@ import { Button, Input, Card, CardContent, CardHeader, CardTitle, LinkBox, Statu
 
 export function FitAdmin() {
   const [sites, setSites] = useState<any[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [name, setName] = useState("Main entrance");
   const appUrl = typeof window !== "undefined" ? window.location.origin : "";
 
-  async function load() { setSites((await jsonFetch("/api/modules/fit")).sites); }
+  async function load() {
+    setSites((await jsonFetch("/api/modules/fit")).sites);
+    setLoaded(true);
+  }
   useEffect(() => { load().catch(console.error); }, []);
 
   async function create(e: React.FormEvent) {
@@ -31,10 +35,18 @@ export function FitAdmin() {
       <Card>
         <CardHeader><CardTitle>Checks</CardTitle></CardHeader>
         <CardContent className="space-y-3">
-          {sites.map((s) => (
+          {loaded && sites.length === 0 && <p className="text-sm text-muted-foreground">No gates yet. Create one and it will show here.</p>}
+          {sites.map((s) => {
+            const url = `${appUrl}/p/fit/${s.publicToken}`;
+            return (
             <div key={s.id} className="rounded-md border p-3 text-sm">
-              <p className="font-medium">{s.name}</p>
-              <LinkBox url={`${appUrl}/p/fit/${s.publicToken}`} />
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-medium">{s.name}</p>
+                <Button size="sm" variant="outline" asChild>
+                  <a href={url}>Open gate</a>
+                </Button>
+              </div>
+              <LinkBox url={url} />
               <ul className="mt-2 space-y-1">
                 {(s.checks ?? []).slice(0, 10).map((c: any) => (
                   <li key={c.id} className="flex justify-between gap-2">
@@ -44,7 +56,8 @@ export function FitAdmin() {
                 ))}
               </ul>
             </div>
-          ))}
+            );
+          })}
         </CardContent>
       </Card>
     </div>

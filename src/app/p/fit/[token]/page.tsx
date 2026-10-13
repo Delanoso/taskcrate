@@ -1,52 +1,199 @@
 "use client";
-import { useEffect, useState } from "react";
+
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { Button, Input } from "@/components/modules/ui-bits";
 
+type Site = { name: string; companyName: string; bubbles: number; lifeMs: number };
+type Bubble = { index: number; x: number; y: number };
+
 export default function Page() {
   const { token } = useParams<{ token: string }>();
-  const [site, setSite] = useState<any>(null);
+  const [site, setSite] = useState<Site | null>(null);
+  const [missing, setMissing] = useState(false);
   const [employeeName, setEmployeeName] = useState("");
   const [ppe, setPpe] = useState(false);
-  const [phase, setPhase] = useState<"idle"|"wait"|"go"|"done">("idle");
-  const [start, setStart] = useState(0);
+  const [phase, setPhase] = useState<"form" | "play" | "done">("form");
+  const [bubble, setBubble] = useState<Bubble | null>(null);
+  const [popped, setPopped] = useState(0);
+  const [missed, setMissed] = useState(0);
   const [result, setResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const timers = useRef<number[]>([]);
+  const pops = useRef<(number | null)[]>([]);
+  const alive = useRef<number | null>(null);
+  const born = useRef(0);
+  const sent = useRef(false);
+  const siteRef = useRef<Site | null>(null);
+  const nameRef = useRef("");
+  const ppeRef = useRef(false);
 
   useEffect(() => {
-    fetch(`/api/modules/fit/public/${token}`).then(r => r.json()).then(d => setSite(d.site));
+    fetch(`/api/modules/fit/public/${token}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d) => {
+        siteRef.current = d.site;
+        setSite(d.site);
+      })
+      .catch(() => setMissing(true));
+    return () => timers.current.forEach((t) => clearTimeout(t));
   }, [token]);
 
-  function beginTest() {
-    setPhase("wait");
-    const delay = 800 + Math.random() * 1500;
-    setTimeout(() => { setStart(performance.now()); setPhase("go"); }, delay);
+  function later(fn: () => void, ms: number) {
+    const t = window.setTimeout(fn, ms);
+    timers.current.push(t);
   }
 
-  async function react() {
-    if (phase !== "go") return;
-    const reactionMs = Math.round(performance.now() - start);
-    setPhase("done");
-    const res = await fetch(`/api/modules/fit/public/${token}`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ employeeName, reactionMs, ppeConfirmed: ppe }),
+  function arm(index: number) {
+    const rules = siteRef.current;
+    if (!rules) return;
+    if (index >= rules.bubbles) {
+      void finish();
+      return;
+    }
+    const gap = 450 + Math.random() * 1100;
+    later(() => show(index), gap);
+  }
+
+  function show(index: number) {
+    const rules = siteRef.current;
+    if (!rules) return;
+    born.current = performance.now();
+    alive.current = index;
+    setBubble({
+      index,
+      x: 14 + Math.random() * 72,
+      y: 16 + Math.random() * 68,
     });
-    const data = await res.json();
-    if (!res.ok) return alert(data.error);
-    setResult(data.status);
+    later(() => {
+      if (alive.current !== index) return;
+      alive.current = null;
+      pops.current[index] = null;
+      setMissed((n) => n + 1);
+      setBubble(null);
+      arm(index + 1);
+    }, rules.lifeMs);
   }
 
-  if (!site) return <p>Loading…</p>;
-  if (result) return <div className="rounded-xl border bg-card p-6 text-center"><h1 className="text-xl font-semibold">{result.replace(/_/g," ")}</h1>{result !== "VERIFIED_READY" && <p className="mt-2 text-sm text-destructive">Foreman has been alerted for a manual check.</p>}</div>;
+  function popBubble() {
+    const rules = siteRef.current;
+    const index = alive.current;
+    if (!rules || index == null) return;
+    alive.current = null;
+    const reaction = Math.max(1, Math.min(rules.lifeMs, Math.round(performance.now() - born.current)));
+    pops.current[index] = reaction;
+    setPopped((n) => n + 1);
+    setBubble(null);
+    arm(index + 1);
+  }
+
+  function start() {
+    const rules = siteRef.current;
+    if (!rules || employeeName.trim().length < 2) return;
+    timers.current.forEach((t) => clearTimeout(t));
+    timers.current = [];
+    pops.current = [];
+    alive.current = null;
+    sent.current = false;
+    nameRef.current = employeeName.trim();
+    ppeRef.current = ppe;
+    setPopped(0);
+    setMissed(0);
+    setError(null);
+    setBubble(null);
+    setPhase("play");
+    arm(0);
+  }
+
+  async function finish() {
+    const rules = siteRef.current;
+    if (!rules || sent.current) return;
+    sent.current = true;
+    setBubble(null);
+    const res = await fetch(`/api/modules/fit/public/${token}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        employeeName: nameRef.current,
+        ppeConfirmed: ppeRef.current,
+        pops: Array.from({ length: rules.bubbles }, (_, i) => ({ reactionMs: pops.current[i] ?? null })),
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      sent.current = false;
+      setPhase("form");
+      setError(data.error ?? "Could not save the check. Please try again.");
+      return;
+    }
+    setResult(data.status);
+    setPhase("done");
+  }
+
+  if (missing) return <p className="text-sm text-muted-foreground">This gate link is no longer valid.</p>;
+  if (!site) return <p className="text-sm text-muted-foreground">Loading…</p>;
+
+  if (phase === "done" && result) {
+    const ready = result === "VERIFIED_READY";
+    return (
+      <div className={`rounded-xl border bg-card p-6 text-center ${ready ? "" : "border-destructive/40"}`}>
+        <h1 className="text-xl font-semibold">{ready ? "Verified ready" : "Not cleared"}</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {ready ? "You can start the shift." : "Foreman has been alerted for a manual check."}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3 rounded-xl border bg-card p-5">
+      <style>{`@keyframes fit-bubble { 0% { transform: translate(-50%, -50%) scale(0.3); } 12% { transform: translate(-50%, -50%) scale(1); } 100% { transform: translate(-50%, -50%) scale(0.7); } }`}</style>
       <p className="text-sm text-muted-foreground">{site.companyName}</p>
       <h1 className="text-xl font-semibold">Fit-for-duty — {site.name}</h1>
-      <Input placeholder="Your name" value={employeeName} onChange={(e) => setEmployeeName(e.target.value)} />
-      <label className="flex gap-2 text-sm"><input type="checkbox" checked={ppe} onChange={(e) => setPpe(e.target.checked)} /> Confirm steel-toe boots secure & helmet intact</label>
-      {phase === "idle" && <Button className="w-full" disabled={!employeeName} onClick={beginTest}>Start 30s check</Button>}
-      {phase === "wait" && <p className="text-center text-sm text-muted-foreground">Wait for GO…</p>}
-      {phase === "go" && <Button className="w-full h-24 text-lg" onClick={react}>GO — TAP NOW</Button>}
+
+      {phase === "form" && (
+        <>
+          <p className="text-sm text-muted-foreground">
+            {site.bubbles} bubbles will appear, one at a time, in different places. Tap each one before it disappears.
+          </p>
+          <Input placeholder="Your name" value={employeeName} onChange={(e) => setEmployeeName(e.target.value)} />
+          <label className="flex gap-2 text-sm">
+            <input type="checkbox" checked={ppe} onChange={(e) => setPpe(e.target.checked)} />
+            Confirm steel-toe boots secure and helmet intact
+          </label>
+          <Button className="w-full" disabled={employeeName.trim().length < 2 || !ppe} onClick={start}>
+            Start check
+          </Button>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+        </>
+      )}
+
+      {phase === "play" && (
+        <>
+          <p className="text-sm text-muted-foreground">
+            Popped {popped} · Missed {missed} · {popped + missed} of {site.bubbles}
+          </p>
+          <div className="relative h-80 overflow-hidden rounded-lg bg-muted/60 touch-manipulation sm:h-96">
+            {!bubble && <p className="absolute inset-0 grid place-items-center text-sm text-muted-foreground">Watch for the next bubble…</p>}
+            {bubble && (
+              <button
+                type="button"
+                aria-label="Pop the bubble"
+                onClick={popBubble}
+                className="absolute grid size-20 place-items-center rounded-full bg-sky-500 text-sm font-semibold text-white shadow-lg"
+                style={{
+                  left: `${bubble.x}%`,
+                  top: `${bubble.y}%`,
+                  animation: `fit-bubble ${site.lifeMs}ms linear forwards`,
+                }}
+              >
+                Pop
+              </button>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
