@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { saveDataUrlUpload } from "@/lib/uploads";
+import { closeTrip, handOverTrip, PretripError, startPretrip, toTripView } from "@/lib/modules/pretrip";
+import { PANEL_SIDES, PRETRIP_CHECKS, tripIsOpen } from "@/lib/modules/pretrip-shared";
 
-const CHECKS = ["Oil level", "Tire tread", "Window cracks", "Lights working", "Body damage noted"];
+const signatureSchema = z.string().startsWith("data:image/").max(500_000);
+const photoSchema = z.object({
+  side: z.enum(["front", "rear", "left", "right", "damage"]),
+  dataUrl: z.string().startsWith("data:image/").max(1_500_000),
+});
+const checkSchema = z.object({ key: z.string(), pass: z.boolean() });
 
 export async function GET(_req: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -11,83 +17,71 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
     where: { publicToken: token },
     include: {
       organization: { include: { branding: true } },
-      trips: { orderBy: { createdAt: "desc" }, take: 1 },
+      trips: { orderBy: { createdAt: "desc" }, take: 8 },
     },
   });
   if (!vehicle) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const open = vehicle.trips.find((trip) => tripIsOpen(trip));
+  const lastClosed = vehicle.trips.find((trip) => trip.endKm != null);
   return NextResponse.json({
     vehicle: {
       name: vehicle.name,
       regNumber: vehicle.regNumber,
-      checklist: CHECKS,
-      lastTrip: vehicle.trips[0] ?? null,
+      make: vehicle.make,
       companyName: vehicle.organization.branding?.displayName ?? vehicle.organization.name,
     },
+    checks: PRETRIP_CHECKS,
+    panels: PANEL_SIDES,
+    lastEndKm: lastClosed?.endKm ?? null,
+    openTrip: open ? toTripView(open, false) : null,
   });
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
-  const { token } = await params;
-  const vehicle = await db.vehicle.findUnique({
-    where: { publicToken: token },
-    include: { trips: { orderBy: { createdAt: "desc" }, take: 1 } },
-  });
-  if (!vehicle) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const body = z.object({
-    driverName: z.string().min(2),
-    startKm: z.number().int().nonnegative(),
-    checklist: z.array(z.boolean()).min(5),
-    handoverFrom: z.string().optional(),
-    handoverTo: z.string().optional(),
-    panelPhotos: z.array(z.string().startsWith("data:image/")).max(4).optional(),
-  }).parse(await req.json());
+  try {
+    const { token } = await params;
+    const vehicle = await db.vehicle.findUnique({ where: { publicToken: token } });
+    if (!vehicle) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const body = z.discriminatedUnion("action", [
+      z.object({
+        action: z.literal("pretrip"),
+        driverName: z.string().trim().min(2).max(120),
+        licenceNo: z.string().trim().max(40).optional(),
+        site: z.string().trim().max(120).optional(),
+        startKm: z.number().int().nonnegative().max(9_999_999),
+        checks: z.array(checkSchema).min(PRETRIP_CHECKS.length),
+        faultNote: z.string().trim().max(2000).optional(),
+        photos: z.array(photoSchema).max(6),
+        driverSignature: signatureSchema,
+      }),
+      z.object({
+        action: z.literal("handover"),
+        fromName: z.string().trim().min(2).max(120),
+        fromSignature: signatureSchema,
+        toName: z.string().trim().min(2).max(120),
+        toSignature: signatureSchema,
+        handoverKm: z.number().int().nonnegative().max(9_999_999),
+        note: z.string().trim().max(2000).optional(),
+        photos: z.array(photoSchema).max(2).optional(),
+      }),
+      z.object({
+        action: z.literal("close"),
+        endDriverName: z.string().trim().min(2).max(120),
+        endSignature: signatureSchema,
+        endKm: z.number().int().nonnegative().max(9_999_999),
+        endNote: z.string().trim().max(2000).optional(),
+      }),
+    ]).parse(await req.json());
 
-  const last = vehicle.trips[0];
-  let varianceFlag = false;
-  if (last?.endKm != null && body.startKm < last.endKm) varianceFlag = true;
-  if (last?.endKm != null && Math.abs(body.startKm - last.endKm) > 5) varianceFlag = true;
-
-  const photos: string[] = [];
-  if (body.panelPhotos?.length) {
-    for (const p of body.panelPhotos) {
-      photos.push(await saveDataUrlUpload(p, `vehicle/${vehicle.organizationId}`));
-    }
+    const trip = body.action === "pretrip"
+      ? await startPretrip({ vehicle, ...body })
+      : body.action === "handover"
+        ? await handOverTrip({ vehicle, ...body })
+        : await closeTrip({ vehicle, ...body });
+    return NextResponse.json({ trip: toTripView(trip, true) });
+  } catch (error) {
+    if (error instanceof z.ZodError) return NextResponse.json({ error: "Check the pre-trip fields and try again." }, { status: 400 });
+    if (error instanceof PretripError) return NextResponse.json({ error: error.message }, { status: 400 });
+    throw error;
   }
-
-  const trip = await db.vehicleTripLog.create({
-    data: {
-      vehicleId: vehicle.id,
-      driverName: body.driverName,
-      startKm: body.startKm,
-      endKm: body.startKm,
-      checklistJson: JSON.stringify(body.checklist),
-      photoUrlsJson: JSON.stringify(photos),
-      handoverFrom: body.handoverFrom,
-      handoverTo: body.handoverTo,
-      varianceFlag,
-    },
-  });
-
-  if (varianceFlag || body.checklist.some((c) => !c)) {
-    await db.notification.create({
-      data: {
-        organizationId: vehicle.organizationId,
-        productSlug: "pretrip-handover",
-        title: "Fleet variance / fault flag",
-        body: `${vehicle.regNumber}: driver ${body.driverName}, km ${body.startKm}`,
-      },
-    });
-    await db.jobCard.create({
-      data: {
-        organizationId: vehicle.organizationId,
-        mode: "internal",
-        title: `Vehicle check — ${vehicle.regNumber}`,
-        machineRef: vehicle.regNumber,
-        description: `Auto ticket from Pre-Trip log ${trip.id}. Variance=${varianceFlag}`,
-        status: "open",
-      },
-    });
-  }
-
-  return NextResponse.json({ ok: true, tripId: trip.id, varianceFlag });
 }

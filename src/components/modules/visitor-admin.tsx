@@ -6,6 +6,8 @@ import { Button, Label, Card, CardContent, CardDescription, CardHeader, CardTitl
 type Visitor = {
   id: string;
   fullName: string;
+  company: string | null;
+  hostName: string | null;
   purpose: string;
   phone: string;
   registration: string | null;
@@ -77,7 +79,7 @@ export function VisitorAdmin() {
                     <div className="min-w-0">
                       <p className="font-medium">{v.fullName}</p>
                       <p className="truncate text-muted-foreground">
-                        {v.purpose} · {v.phone}{v.registration ? ` · ${v.registration}` : ""}
+                        {v.hostName ? `Visiting ${v.hostName} · ` : ""}{v.purpose} · {v.phone}{v.registration ? ` · ${v.registration}` : ""}
                       </p>
                       <p className="text-xs text-muted-foreground">In {fmt(v.createdAt)}</p>
                     </div>
@@ -130,8 +132,14 @@ export function VisitorAdmin() {
       </div>
 
       <Card className="self-start">
-        <CardHeader><CardTitle>Visitor ledger</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>Visitor ledger</CardTitle>
+          <CardDescription>Arrivals, the person they came to see, and the time they left.</CardDescription>
+        </CardHeader>
         <CardContent className="space-y-2 text-sm">
+          <Button size="sm" variant="outline" asChild>
+            <a href="/api/modules/visitor/export">Download Excel</a>
+          </Button>
           {(site.visitors ?? []).map((v: Visitor) => (
             <div key={v.id} className="border-b py-2">
               <div className="flex items-center justify-between gap-2">
@@ -142,7 +150,7 @@ export function VisitorAdmin() {
                   <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-950 dark:text-green-300">On site</span>
                 )}
               </div>
-              <p className="text-muted-foreground">{v.purpose} · {v.phone}</p>
+              <p className="text-muted-foreground">{v.company ? `${v.company} · ` : ""}{v.hostName ? `Visiting ${v.hostName} · ` : ""}{v.purpose} · {v.phone}</p>
               <p className="text-xs text-muted-foreground">
                 In {fmt(v.createdAt)}
                 {v.checkedOutAt && (

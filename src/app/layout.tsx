@@ -13,7 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Delano Solutions — Micro-SaaS Suite",
+  metadataBase: new URL("https://taskcrate.co.za"),
+  title: "TaskCrate",
   description:
     "Market, sell, and deliver multi-tenant business apps from one premium dashboard.",
 };

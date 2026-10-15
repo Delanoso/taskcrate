@@ -1,9 +1,11 @@
 export const TERMS_AND_CONDITIONS = `
-DELANO SOLUTIONS — PLATFORM TERMS & CONDITIONS
+TASKCRATE — PLATFORM TERMS & CONDITIONS
 Version ${"2026-10-12-v1"}
 
+© Delano Solutions. All rights reserved. TaskCrate is owned and operated by Delano Solutions.
+
 1. Agreement
-By registering, purchasing, or using any Delano Solutions micro-application ("App"), you agree to these Terms on behalf of yourself and your organization.
+By registering, purchasing, or using any TaskCrate application ("App"), you agree to these Terms on behalf of yourself and your organization.
 
 2. License
 Delano Solutions grants a non-exclusive, non-transferable subscription license to use the Apps for internal business purposes. You may not copy, reverse engineer, resell, or reproduce the Apps or their source code.
@@ -11,8 +13,10 @@ Delano Solutions grants a non-exclusive, non-transferable subscription license t
 3. Multi-tenant isolation
 Each organization's data is logically separated. You are responsible for managing users and permissions within your organization.
 
-4. Payments
-Subscriptions renew automatically unless cancelled. Fees are non-refundable except where required by law.
+4. Trial and payments
+A new company may receive one 7-day trial of every App. No card is required for the trial. A second registration with the same email, cellphone number, or company name does not receive another trial.
+
+Each App rents for R1 000 per month. The first payment covers the days left in the current month, including the day of payment. After that, the rent is due on the 1st of each month. If a payment is missed, cancelled, or fails, that App closes until it is paid. Fees are non-refundable except where required by law.
 
 5. Acceptable use
 You will not use the Apps for unlawful purposes, to store malicious content, or to attempt to access another tenant's data.
@@ -21,16 +25,52 @@ You will not use the Apps for unlawful purposes, to store malicious content, or 
 All Apps, branding, and platform software remain the exclusive property of Delano Solutions.
 
 7. Data & privacy
-You retain ownership of your business data. Delano Solutions processes data to provide the service and may use subprocessors listed in our privacy notice.
+You retain ownership of your business data. Delano Solutions processes personal information as described in the privacy notice at https://taskcrate.co.za/legal/privacy.
 
 8. Support
-Self-service support is provided through in-app documentation. Enterprise support may be purchased separately.
+Support requests are logged as tickets inside TaskCrate.
 
 9. Limitation of liability
 To the maximum extent permitted by law, Delano Solutions is not liable for indirect or consequential damages.
 
 10. Contact
-Legal inquiries: legal@delanosolutions.example (replace with your production address before launch).
+Legal and privacy inquiries: hello@taskcrate.co.za
+`.trim();
+
+export const PRIVACY_NOTICE = `
+TASKCRATE — PRIVACY NOTICE
+14 October 2026
+
+© Delano Solutions. TaskCrate is owned and operated by Delano Solutions.
+
+1. Who we are
+Delano Solutions operates TaskCrate at https://taskcrate.co.za. Questions about this notice go to hello@taskcrate.co.za.
+
+2. Account information
+When a company registers we store the person's name, work email, cellphone number, company name, the date of registration, and whether a 7-day trial was granted. The password is stored only as a hash. We do not keep the password itself.
+
+We use this information to open the workspace, run the trial, refuse a second trial on the same email, cellphone number, or company name, send password-reset links, answer support tickets, and contact the company about TaskCrate.
+
+3. Records entered in the apps
+The company owns the records it enters, such as employee, visitor, permit, and similar business records. Delano Solutions stores and displays those records so the Apps can run. We do not sell them.
+
+4. Email
+Account messages, including password-reset links, are sent from hello@taskcrate.co.za.
+
+5. Payments
+When billing is open, monthly rent is collected by PayFast. Card numbers are handled by PayFast and are not stored in TaskCrate. We store whether an App is paid and the date it is paid until.
+
+6. Support
+Tickets submitted in TaskCrate are stored in the control room and handled by Delano Solutions.
+
+7. How long we keep it
+We keep account and company records while the account exists, and afterwards for support, trial records, and our own records. Email hello@taskcrate.co.za to ask us to close an account.
+
+8. Sharing
+We do not sell personal information. Email to customers is sent from hello@taskcrate.co.za. Payment, when billing is open, is processed by PayFast.
+
+9. Access and correction
+Email hello@taskcrate.co.za to ask what account information we hold, or to correct it.
 `.trim();
 
 export const IP_NOTICE_TEXT = `

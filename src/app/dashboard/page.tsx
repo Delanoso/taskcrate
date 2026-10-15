@@ -3,19 +3,21 @@ import { ProductCard } from "@/components/platform/product-card";
 import { DashboardShell } from "@/components/platform/dashboard-shell";
 import { Button } from "@/components/ui/button";
 import { PRODUCTS } from "@/data/products";
+import { formatRentDate } from "@/lib/billing";
 import { requireDashboardContext } from "@/lib/dashboard-context";
-import { canAccessProduct } from "@/lib/rbac";
+import { canAccessProduct, canAddApps } from "@/lib/rbac";
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ upgrade?: string }>;
+  searchParams: Promise<{ upgrade?: string; trial?: string }>;
 }) {
   const { org, user, access } = await requireDashboardContext();
   const sp = await searchParams;
 
   const accessible = PRODUCTS.filter((p) => canAccessProduct(access, p.slug));
   const availableToBuy = PRODUCTS.filter((p) => access.subscribedSlugs.includes(p.slug));
+  const admin = canAddApps(access.role);
 
   return (
     <DashboardShell
@@ -27,7 +29,9 @@ export default async function DashboardPage({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Welcome back, {user.fullName}</h1>
           <p className="text-muted-foreground">
-            Manage subscriptions, team access, and open modules from one place.
+            {admin
+              ? "Open apps, invite people, and add monthly apps."
+              : "Open the apps that are available to you."}
           </p>
         </div>
         <form action="/api/auth/logout" method="post">
@@ -37,13 +41,31 @@ export default async function DashboardPage({
         </form>
       </div>
 
+      {access.trialActive && access.trialEndsAt ? (
+        <div className="mt-6 rounded-lg border bg-card px-4 py-3 text-sm">
+          Every app is open until {formatRentDate(access.trialEndsAt)}. No card was taken. After the
+          trial, an app stays open only once it is paid.
+        </div>
+      ) : null}
+
+      {!access.trialActive && org.trialNote ? (
+        <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          {org.trialNote} The apps open after payment.
+        </div>
+      ) : null}
+
       {sp.upgrade === "1" && (
         <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          That module is not on your plan or your role cannot access it. Ask an admin or{" "}
-          <Link href="/products" className="underline">
-            subscribe
-          </Link>
-          .
+          This app is closed until the monthly rent is paid.
+          {admin ? (
+            <>
+              {" "}
+              <Link href="/products" className="underline">
+                Pay to open it
+              </Link>
+              .
+            </>
+          ) : null}
         </div>
       )}
 
@@ -51,10 +73,26 @@ export default async function DashboardPage({
         <h2 className="text-lg font-medium">Active modules</h2>
         {accessible.length === 0 ? (
           <div className="mt-4 rounded-xl border bg-card p-8 text-center">
-            <p className="text-muted-foreground">No modules yet — pick one from the catalog.</p>
-            <Button asChild className="mt-4">
-              <Link href="/products">Browse products</Link>
-            </Button>
+            <p className="text-muted-foreground">
+              {admin
+                ? access.trialEndsAt && !access.trialActive
+                  ? "The 7-day trial has ended. Pay for the apps you want to keep."
+                  : org.trialNote
+                    ? "A trial was not started for this company. Pay for the apps you want."
+                    : access.lapsedSlugs.length > 0
+                      ? "Apps are closed because the monthly rent was not paid."
+                      : "No apps yet."
+                : "No apps are open for you yet."}
+            </p>
+            {admin ? (
+              <Button asChild className="mt-4">
+                <Link href="/products">
+                  {(access.trialEndsAt && !access.trialActive) || org.trialNote || access.lapsedSlugs.length > 0
+                    ? "Pay to open apps"
+                    : "Browse products"}
+                </Link>
+              </Button>
+            ) : null}
           </div>
         ) : (
           <div className="mt-4 grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
@@ -69,7 +107,7 @@ export default async function DashboardPage({
         <section className="mt-10">
           <h2 className="text-lg font-medium">Subscribed but restricted</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Your administrator limited which apps you can open.
+            An admin chooses which apps you can open.
           </p>
         </section>
       )}

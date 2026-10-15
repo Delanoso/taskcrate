@@ -1,5 +1,9 @@
 import { OrgRole } from "@/generated/prisma/client";
+import { PRODUCTS } from "@/data/products";
+import { expireUnpaidSubscriptions, formatRentDate } from "@/lib/billing";
 import { db } from "@/lib/db";
+import { sendAlertEmail } from "@/lib/mail";
+import { isPlatformAdmin } from "@/lib/platform-admin";
 import type { SessionPayload } from "@/lib/session";
 
 export type AccessContext = {
@@ -7,6 +11,9 @@ export type AccessContext = {
   departmentId: string | null;
   productAccess: string[] | null;
   subscribedSlugs: string[];
+  lapsedSlugs: string[];
+  trialEndsAt: Date | null;
+  trialActive: boolean;
 };
 
 export async function getAccessContext(
@@ -21,12 +28,54 @@ export async function getAccessContext(
     },
   });
 
+  const account = await db.user.findUnique({
+    where: { id: session.userId },
+    select: { email: true, platformAdmin: true },
+  });
+  if (isPlatformAdmin(account)) {
+    return {
+      role: OrgRole.OWNER,
+      departmentId: null,
+      productAccess: null,
+      subscribedSlugs: PRODUCTS.map((p) => p.slug),
+      lapsedSlugs: [],
+      trialEndsAt: null,
+      trialActive: false,
+    };
+  }
+
   if (!membership) throw new Error("FORBIDDEN");
+
+  await expireUnpaidSubscriptions(session.organizationId);
+
+  const org = await db.organization.findUnique({
+    where: { id: session.organizationId },
+    select: { name: true, trialEndsAt: true, trialNoticeSent: true },
+  });
+  const trialActive = !!(org?.trialEndsAt && org.trialEndsAt.getTime() > Date.now());
+  if (org?.trialEndsAt && !trialActive && !org.trialNoticeSent) {
+    await db.organization.update({
+      where: { id: session.organizationId },
+      data: { trialNoticeSent: true },
+    });
+    await sendAlertEmail({
+      subject: `[TaskCrate] Trial ended: ${org.name}`,
+      text: `${org.name} finished the 7-day trial on ${formatRentDate(org.trialEndsAt)} and has not paid.`,
+    });
+  }
 
   const subs = await db.subscription.findMany({
     where: {
       organizationId: session.organizationId,
       status: "active",
+      currentPeriodEnd: { gt: new Date() },
+    },
+    select: { productSlug: true },
+  });
+  const lapsed = await db.subscription.findMany({
+    where: {
+      organizationId: session.organizationId,
+      status: { in: ["past_due", "canceled", "unpaid"] },
     },
     select: { productSlug: true },
   });
@@ -44,12 +93,27 @@ export async function getAccessContext(
     role: membership.role,
     departmentId: membership.departmentId,
     productAccess,
-    subscribedSlugs: subs.map((s) => s.productSlug),
+    subscribedSlugs: trialActive ? PRODUCTS.map((product) => product.slug) : subs.map((s) => s.productSlug),
+    lapsedSlugs: lapsed.map((s) => s.productSlug),
+    trialEndsAt: org?.trialEndsAt ?? null,
+    trialActive,
   };
 }
 
-export function canManageTeam(role: OrgRole) {
+export function isCompanyAdmin(role: OrgRole) {
   return role === OrgRole.OWNER || role === OrgRole.ADMIN;
+}
+
+export function canManageTeam(role: OrgRole) {
+  return isCompanyAdmin(role);
+}
+
+export function canInviteUsers(role: OrgRole) {
+  return isCompanyAdmin(role);
+}
+
+export function canAddApps(role: OrgRole) {
+  return isCompanyAdmin(role);
 }
 
 export function canAccessProduct(

@@ -1,39 +1,85 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { Button, Input } from "@/components/modules/ui-bits";
+import { StockMoveForm, type StockMovePayload } from "@/components/modules/stock-move-form";
+import { StockRegister } from "@/components/modules/stock-register";
+import { Button } from "@/components/modules/ui-bits";
+import { partyLabels, type StockItemView } from "@/lib/modules/stock-shared";
 
 export default function Page() {
   const { token } = useParams<{ token: string }>();
-  const [item, setItem] = useState<any>(null);
-  const [qty, setQty] = useState("1");
-  const [msg, setMsg] = useState("");
+  const [item, setItem] = useState<StockItemView | null>(null);
+  const [companyName, setCompanyName] = useState("");
+  const [kind, setKind] = useState<"issue" | "return">("issue");
+  const [formKey, setFormKey] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [missing, setMissing] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/modules/stock/public/${token}`).then(r => r.json()).then(d => setItem(d.item));
+    fetch(`/api/modules/stock/public/${token}`)
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) {
+          setMissing(true);
+          return;
+        }
+        setItem(data.item);
+        setCompanyName(data.companyName ?? "");
+      })
+      .catch(() => setMissing(true));
   }, [token]);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    const res = await fetch(`/api/modules/stock/public/${token}`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ qty: Number(qty) }),
-    });
-    const data = await res.json();
-    if (!res.ok) return alert(data.error);
-    setMsg(`Remaining ${data.quantity}`);
-    setItem({ ...item, quantity: data.quantity });
+  async function save(payload: StockMovePayload) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/modules/stock/public/${token}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Could not save that entry.");
+      setItem(data.item);
+      setFormKey((value) => value + 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save that entry.");
+    } finally {
+      setBusy(false);
+    }
   }
 
-  if (!item) return <p>Loading…</p>;
+  if (missing) return <p className="text-sm">This stock item could not be found.</p>;
+  if (!item) return <p className="text-sm text-muted-foreground">Loading stock…</p>;
+
   return (
-    <form onSubmit={submit} className="space-y-3 rounded-xl border bg-card p-5">
-      <p className="text-sm text-muted-foreground">{item.companyName}</p>
-      <h1 className="text-xl font-semibold">Scan out — {item.name}</h1>
-      <p className="text-sm">On hand: {item.quantity}</p>
-      <Input type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} />
-      <Button type="submit" className="w-full">Scan out</Button>
-      {msg && <p className="text-sm">{msg}</p>}
-    </form>
+    <div className="space-y-4">
+      <div className="rounded-xl border bg-card p-4">
+        <p className="text-sm text-muted-foreground">{companyName}</p>
+        <h1 className="text-xl font-semibold">{item.name}</h1>
+        <p className="mt-1 text-sm">{item.quantity} {item.unit} on hand{item.location ? ` · ${item.location}` : ""}</p>
+      </div>
+      <div className="space-y-3 rounded-xl border bg-card p-4">
+        <div className="flex gap-2">
+          {(["issue", "return"] as const).map((option) => (
+            <Button key={option} type="button" size="sm" variant={option === kind ? "default" : "outline"} onClick={() => { setKind(option); setError(null); setFormKey((value) => value + 1); }}>
+              {partyLabels(option).title}
+            </Button>
+          ))}
+        </div>
+        {kind === "issue" && item.quantity < 1 ? (
+          <p className="text-sm text-muted-foreground">Nothing on hand to sign out.</p>
+        ) : (
+          <StockMoveForm key={`${kind}-${formKey}`} kind={kind} unit={item.unit} loggerName="" busy={busy} onSubmit={save} />
+        )}
+        {error && <p className="text-sm text-destructive">{error}</p>}
+      </div>
+      <div className="rounded-xl border bg-card p-4">
+        <h2 className="mb-3 font-semibold">Recent register</h2>
+        <StockRegister movements={item.movements} unit={item.unit} />
+      </div>
+    </div>
   );
 }

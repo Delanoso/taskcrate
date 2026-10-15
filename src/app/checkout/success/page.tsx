@@ -20,6 +20,9 @@ export default async function CheckoutSuccessPage({
     try {
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
       const session = await stripe.checkout.sessions.retrieve(sp.session_id);
+      if (session.payment_status !== "paid") {
+        message = "Payment has not cleared, so the app stays closed.";
+      } else {
       const meta = session.metadata ?? {};
       if (meta.email && meta.fullName && meta.companyName && meta.productSlug) {
         const result = await provisionWorkspaceFromPayment({
@@ -27,18 +30,23 @@ export default async function CheckoutSuccessPage({
           fullName: meta.fullName,
           companyName: meta.companyName,
           productSlug: meta.productSlug,
-          paymentRef: session.subscription?.toString() ?? session.id,
+    paymentRef:
+      typeof session.subscription === "string"
+        ? session.subscription
+        : session.subscription?.id ?? session.id,
           provider: "stripe",
         });
         await createSession({
           userId: result.userId,
           organizationId: result.organizationId,
           email: result.email,
+          sv: result.sessionVersion,
         });
         appSlug = meta.productSlug;
         tempPassword = result.temporaryPassword;
-        message = "Payment cleared. Your Delano workspace is ready.";
+        message = "Payment cleared. Your TaskCrate workspace is ready.";
         loginHint = result.email;
+      }
       }
     } catch {
       message = "Payment succeeded but provisioning needs a moment. Try signing in with your checkout email.";

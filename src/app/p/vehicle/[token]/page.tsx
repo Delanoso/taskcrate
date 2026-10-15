@@ -1,57 +1,113 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { Button, Input } from "@/components/modules/ui-bits";
-import { PhotoInput } from "@/components/modules/photo-input";
+import { CloseForm, HandoverForm, PretripForm, type ClosePayload, type HandoverPayload, type PretripPayload } from "@/components/modules/pretrip-forms";
+import { TripSheet } from "@/components/modules/pretrip-sheet";
+import { Button } from "@/components/modules/ui-bits";
+import { formatKm, formatWhen, type TripView } from "@/lib/modules/pretrip-shared";
+
+type VehicleInfo = { name: string; regNumber: string; make: string | null; companyName: string };
 
 export default function Page() {
   const { token } = useParams<{ token: string }>();
-  const [vehicle, setVehicle] = useState<any>(null);
-  const [driverName, setDriverName] = useState("");
-  const [startKm, setStartKm] = useState("");
-  const [checks, setChecks] = useState<boolean[]>([]);
-  const [photos, setPhotos] = useState<(string | null)[]>([null, null, null, null]);
-  const [result, setResult] = useState<any>(null);
+  const [vehicle, setVehicle] = useState<VehicleInfo | null>(null);
+  const [openTrip, setOpenTrip] = useState<TripView | null>(null);
+  const [lastEndKm, setLastEndKm] = useState<number | null>(null);
+  const [mode, setMode] = useState<"pretrip" | "handover" | "close">("pretrip");
+  const [saved, setSaved] = useState<TripView | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [missing, setMissing] = useState(false);
+  const [formKey, setFormKey] = useState(0);
 
-  useEffect(() => {
-    fetch(`/api/modules/vehicle/public/${token}`).then(r => r.json()).then(d => {
-      setVehicle(d.vehicle);
-      setChecks(d.vehicle.checklist.map(() => false));
-    });
-  }, [token]);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    const res = await fetch(`/api/modules/vehicle/public/${token}`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        driverName,
-        startKm: Number(startKm),
-        checklist: checks,
-        panelPhotos: photos.filter(Boolean),
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) return alert(data.error);
-    setResult(data);
+  function load() {
+    return fetch(`/api/modules/vehicle/public/${token}`)
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) {
+          setMissing(true);
+          return;
+        }
+        setVehicle(data.vehicle);
+        setOpenTrip(data.openTrip);
+        setLastEndKm(data.lastEndKm);
+        setMode(data.openTrip ? "close" : "pretrip");
+      })
+      .catch(() => setMissing(true));
   }
 
-  if (!vehicle) return <p>Loading…</p>;
-  if (result) return <div className="rounded-xl border bg-card p-6 text-center"><h1 className="text-xl font-semibold">Pre-trip logged</h1>{result.varianceFlag && <p className="mt-2 text-sm text-destructive">Variance flagged — fleet notified & Job Card opened</p>}</div>;
+  useEffect(() => {
+    load().catch(() => setMissing(true));
+  }, [token]);
+
+  async function send(action: string, payload: PretripPayload | HandoverPayload | ClosePayload) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/modules/vehicle/public/${token}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, ...payload }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Could not save that entry.");
+      setSaved(data.trip);
+      setFormKey((value) => value + 1);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save that entry.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (missing) return <p className="text-sm">This vehicle could not be found.</p>;
+  if (!vehicle) return <p className="text-sm text-muted-foreground">Loading vehicle…</p>;
 
   return (
-    <form onSubmit={submit} className="space-y-3 rounded-xl border bg-card p-5">
-      <p className="text-sm text-muted-foreground">{vehicle.companyName}</p>
-      <h1 className="text-xl font-semibold">{vehicle.name} · {vehicle.regNumber}</h1>
-      <Input placeholder="Driver name" value={driverName} onChange={(e) => setDriverName(e.target.value)} required />
-      <Input type="number" placeholder="Starting km" value={startKm} onChange={(e) => setStartKm(e.target.value)} required />
-      {vehicle.checklist.map((c: string, i: number) => (
-        <label key={c} className="flex gap-2 text-sm"><input type="checkbox" checked={checks[i]} onChange={(e) => { const n=[...checks]; n[i]=e.target.checked; setChecks(n); }} />{c}</label>
-      ))}
-      {["Front", "Rear", "Left", "Right"].map((label, i) => (
-        <PhotoInput key={label} label={`${label} panel photo`} onChange={(u) => { const n=[...photos]; n[i]=u; setPhotos(n); }} />
-      ))}
-      <Button type="submit" className="w-full">Complete pre-trip / handover</Button>
-    </form>
+    <div className="space-y-4">
+      <div className="rounded-xl border bg-card p-4">
+        <p className="text-sm text-muted-foreground">{vehicle.companyName}</p>
+        <h1 className="text-xl font-semibold">{vehicle.name} · {vehicle.regNumber}</h1>
+        {vehicle.make && <p className="text-sm text-muted-foreground">{vehicle.make}</p>}
+        {lastEndKm != null && <p className="mt-1 text-sm">Last recorded {formatKm(lastEndKm)}</p>}
+      </div>
+
+      {saved && (
+        <div className="rounded-xl border bg-card p-4 text-sm">
+          <p className="font-medium">Saved {saved.endedAt ? formatWhen(saved.endedAt) : saved.handoverAt ? formatWhen(saved.handoverAt) : formatWhen(saved.startedAt)}</p>
+          {saved.varianceFlag && <p className="mt-1 text-destructive">The kilometres do not follow the last trip. A job card was opened.</p>}
+          {saved.checks.some((check) => !check.pass) && <p className="mt-1 text-destructive">A failed check opened a job card.</p>}
+        </div>
+      )}
+
+      {openTrip && (
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            <Button type="button" size="sm" variant={mode === "close" ? "default" : "outline"} onClick={() => setMode("close")}>End the trip</Button>
+            <Button type="button" size="sm" variant={mode === "handover" ? "default" : "outline"} onClick={() => setMode("handover")}>Hand over</Button>
+          </div>
+          {mode === "handover" ? (
+            <div className="rounded-xl border bg-card p-4">
+              <HandoverForm key={formKey} minimumKm={openTrip.handoverKm ?? openTrip.startKm} busy={busy} onSubmit={(payload) => send("handover", payload)} />
+            </div>
+          ) : (
+            <div className="rounded-xl border bg-card p-4">
+              <CloseForm key={formKey} minimumKm={openTrip.handoverKm ?? openTrip.startKm} busy={busy} onSubmit={(payload) => send("close", payload)} />
+            </div>
+          )}
+          <TripSheet trip={openTrip} />
+        </div>
+      )}
+
+      {!openTrip && (
+        <div className="rounded-xl border bg-card p-4">
+          <h2 className="mb-3 font-semibold">Pre-trip</h2>
+          <PretripForm key={formKey} lastEndKm={lastEndKm} busy={busy} onSubmit={(payload) => send("pretrip", payload)} />
+        </div>
+      )}
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </div>
   );
 }

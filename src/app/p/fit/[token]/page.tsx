@@ -3,8 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { Button, Input } from "@/components/modules/ui-bits";
+import { PhotoInput } from "@/components/modules/photo-input";
+import { SignaturePad } from "@/components/platform/signature-pad";
 
-type Site = { name: string; companyName: string; bubbles: number; lifeMs: number };
+type Site = { name: string; companyName: string; bubbles: number; lifeMs: number; ppe: { key: string; label: string }[] };
 type Bubble = { index: number; x: number; y: number };
 
 export default function Page() {
@@ -12,7 +14,10 @@ export default function Page() {
   const [site, setSite] = useState<Site | null>(null);
   const [missing, setMissing] = useState(false);
   const [employeeName, setEmployeeName] = useState("");
-  const [ppe, setPpe] = useState(false);
+  const [employeeNumber, setEmployeeNumber] = useState("");
+  const [ppeAnswers, setPpeAnswers] = useState<Record<string, boolean>>({});
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [signature, setSignature] = useState<string | null>(null);
   const [phase, setPhase] = useState<"form" | "play" | "done">("form");
   const [bubble, setBubble] = useState<Bubble | null>(null);
   const [popped, setPopped] = useState(0);
@@ -27,7 +32,7 @@ export default function Page() {
   const sent = useRef(false);
   const siteRef = useRef<Site | null>(null);
   const nameRef = useRef("");
-  const ppeRef = useRef(false);
+  const packRef = useRef<{ employeeNumber: string; ppe: { key: string; pass: boolean }[]; photo: string; signature: string } | null>(null);
 
   useEffect(() => {
     fetch(`/api/modules/fit/public/${token}`)
@@ -91,13 +96,30 @@ export default function Page() {
   function start() {
     const rules = siteRef.current;
     if (!rules || employeeName.trim().length < 2) return;
+    if (rules.ppe.some((item) => typeof ppeAnswers[item.key] !== "boolean")) {
+      setError("Answer every PPE check.");
+      return;
+    }
+    if (!photo) {
+      setError("Add a photo.");
+      return;
+    }
+    if (!signature) {
+      setError("Sign to confirm you are fit to start.");
+      return;
+    }
     timers.current.forEach((t) => clearTimeout(t));
     timers.current = [];
     pops.current = [];
     alive.current = null;
     sent.current = false;
     nameRef.current = employeeName.trim();
-    ppeRef.current = ppe;
+    packRef.current = {
+      employeeNumber: employeeNumber.trim(),
+      ppe: rules.ppe.map((item) => ({ key: item.key, pass: ppeAnswers[item.key] })),
+      photo,
+      signature,
+    };
     setPopped(0);
     setMissed(0);
     setError(null);
@@ -116,7 +138,10 @@ export default function Page() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         employeeName: nameRef.current,
-        ppeConfirmed: ppeRef.current,
+        employeeNumber: packRef.current?.employeeNumber || undefined,
+        ppe: packRef.current?.ppe ?? [],
+        photo: packRef.current?.photo,
+        signature: packRef.current?.signature,
         pops: Array.from({ length: rules.bubbles }, (_, i) => ({ reactionMs: pops.current[i] ?? null })),
       }),
     });
@@ -158,11 +183,25 @@ export default function Page() {
             {site.bubbles} bubbles will appear, one at a time, in different places. Tap each one before it disappears.
           </p>
           <Input placeholder="Your name" value={employeeName} onChange={(e) => setEmployeeName(e.target.value)} />
-          <label className="flex gap-2 text-sm">
-            <input type="checkbox" checked={ppe} onChange={(e) => setPpe(e.target.checked)} />
-            Confirm steel-toe boots secure and helmet intact
-          </label>
-          <Button className="w-full" disabled={employeeName.trim().length < 2 || !ppe} onClick={start}>
+          <Input placeholder="Employee number" value={employeeNumber} onChange={(e) => setEmployeeNumber(e.target.value)} />
+          <div className="space-y-2">
+            {site.ppe.map((item) => (
+              <div key={item.key} className="flex items-center justify-between gap-2 text-sm">
+                <span>{item.label}</span>
+                <span className="flex gap-1">
+                  <Button type="button" size="sm" variant={ppeAnswers[item.key] === true ? "default" : "outline"} onClick={() => setPpeAnswers((current) => ({ ...current, [item.key]: true }))}>Pass</Button>
+                  <Button type="button" size="sm" variant={ppeAnswers[item.key] === false ? "default" : "outline"} onClick={() => setPpeAnswers((current) => ({ ...current, [item.key]: false }))}>Fail</Button>
+                </span>
+              </div>
+            ))}
+          </div>
+          <PhotoInput label="Photo" onChange={setPhoto} />
+          <div>
+            <p className="mb-1 text-sm font-medium">Signature</p>
+            <p className="mb-2 text-xs text-muted-foreground">Sign to confirm you are fit to start this shift. The time is saved with this signature.</p>
+            <SignaturePad onChange={setSignature} />
+          </div>
+          <Button className="w-full" disabled={employeeName.trim().length < 2} onClick={start}>
             Start check
           </Button>
           {error && <p className="text-sm text-destructive">{error}</p>}

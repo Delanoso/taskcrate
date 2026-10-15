@@ -218,7 +218,7 @@ const SERVER: Record<string, ProductSandbox> = {
 };
 
 const FALLBACK: ProductSandbox = {
-  screenTitle: "Delano app",
+  screenTitle: "TaskCrate",
   subtitle: "Interactive demo",
   steps: [
     { id: "a", label: "Tap primary action" },

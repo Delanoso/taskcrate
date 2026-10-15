@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import type { Prisma } from "@/generated/prisma/client";
+import { companyHasApp } from "@/lib/billing";
 import { db } from "@/lib/db";
 import { requireProductApi } from "@/lib/modules/api-guard";
 import { managersOnly, notFound, parseBody, removeUpload, staffName } from "@/lib/modules/common";
@@ -59,7 +60,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (p.status !== "submitted" && p.status !== "completed") return NextResponse.json({ error: "Only submitted packs can be approved." }, { status: 409 });
     data = { status: "approved", reviewNote: null, reviewedAt: new Date(), reviewedBy: await staffName(gate.session.userId) };
     if (b.addToLeave && !p.leaveEmployeeId) {
-      const leave = await db.subscription.findFirst({ where: { organizationId: orgId, productSlug: "leave-planner", status: "active" } });
+      const leave = await companyHasApp(orgId, "leave-planner");
       if (!leave) return NextResponse.json({ error: "Your company does not subscribe to Leave Planner." }, { status: 400 });
       const personal = decrypt<Personal>(p.personalJson);
       const start = p.startDate ?? new Date();

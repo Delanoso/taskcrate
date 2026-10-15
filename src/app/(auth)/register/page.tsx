@@ -33,16 +33,17 @@ export default function RegisterPage() {
           email: fd.get("email"),
           password: fd.get("password"),
           companyName: fd.get("companyName"),
+          phone: fd.get("phone"),
           acceptedTerms: true,
         }),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const data = (await res.json().catch(() => ({}))) as { error?: string; trial?: boolean };
       if (!res.ok) {
         setError(data.error ?? "Registration failed");
         setLoading(false);
         return;
       }
-      window.location.assign("/dashboard");
+      window.location.assign(data.trial ? "/dashboard?trial=1" : "/dashboard?trial=used");
     } catch {
       setError("Could not reach the server. Check your connection and try again.");
       setLoading(false);
@@ -54,10 +55,9 @@ export default function RegisterPage() {
       <div className="grid gap-8 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Create your organization</CardTitle>
+            <CardTitle>Start the 7-day trial</CardTitle>
             <CardDescription>
-              You will be the owner (admin). Invite departments and control module access from the
-              dashboard.
+              Every app opens for 7 days. No card. One trial per company and per cellphone number.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -78,6 +78,10 @@ export default function RegisterPage() {
                 <Label htmlFor="companyName">Company name</Label>
                 <Input id="companyName" name="companyName" required />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">Cellphone number</Label>
+                <Input id="phone" name="phone" type="tel" placeholder="082 123 4567" required />
+              </div>
               <div className="flex items-start gap-3 rounded-md border p-3">
                 <Checkbox
                   id="terms"
@@ -89,12 +93,16 @@ export default function RegisterPage() {
                   <Link href="/legal/terms" className="underline">
                     Terms & Conditions
                   </Link>{" "}
+                  and{" "}
+                  <Link href="/legal/privacy" className="underline">
+                    Privacy notice
+                  </Link>{" "}
                   on behalf of my organization.
                 </Label>
               </div>
               {error && <p className="text-sm text-destructive">{error}</p>}
               <Button type="submit" className="w-full" disabled={loading || !accepted}>
-                {loading ? "Creating workspace…" : "Create workspace"}
+                {loading ? "Starting trial…" : "Register for the 7-day trial"}
               </Button>
             </form>
             <p className="mt-4 text-center text-sm text-muted-foreground">

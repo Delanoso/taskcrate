@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { IP_NOTICE_VERSION } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { isPlatformAdmin } from "@/lib/platform-admin";
 import { getAccessContext, canAccessProduct } from "@/lib/rbac";
 import { getSession } from "@/lib/session";
 
@@ -18,6 +19,11 @@ export async function requireDashboardContext() {
   ]);
   // Valid token but the user, company or membership is gone (removed from the team, account deleted).
   if (!org || !user || !access) redirect("/login");
+
+  if (isPlatformAdmin(user) && !user.platformAdmin) {
+    await db.user.update({ where: { id: user.id }, data: { platformAdmin: true } });
+    user.platformAdmin = true;
+  }
 
   return { session, org, user, access };
 }

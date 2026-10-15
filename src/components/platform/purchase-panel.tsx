@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { formatRentLabel, RENT_ZAR, RENT_USD } from "@/data/products";
+import { formatRentLabel, RENT_ZAR } from "@/data/products";
+import { monthQuote } from "@/lib/pricing";
 
 export function PurchasePanel({ productSlug }: { productSlug: string }) {
   const router = useRouter();
@@ -67,18 +68,24 @@ export function PurchasePanel({ productSlug }: { productSlug: string }) {
     }
   }
 
+  const quote = monthQuote();
+
   return (
     <Card id="purchase">
       <CardHeader>
-        <CardTitle>Rent This App for R{RENT_ZAR.toLocaleString("en-ZA")}/mo</CardTitle>
+        <CardTitle>Rent this app</CardTitle>
         <CardDescription>
-          {formatRentLabel()} · cancel anytime · workspace provisions after payment
+          R{quote.amount.toFixed(2)} today for the {quote.daysLeft} day{quote.daysLeft === 1 ? "" : "s"} left
+          this month, then R{RENT_ZAR.toLocaleString("en-ZA")} on the 1st of every month.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          Browse free. One-click rent collects checkout details only when you are ready — no account
-          needed to explore. ≈ ${RENT_USD} USD at catalog FX.
+          {formatRentLabel()} after the first partial month. Cancel anytime. Or{" "}
+          <Link href="/register" className="underline">
+            register for a 7-day trial of every app
+          </Link>{" "}
+          with no card.
         </p>
         <div className="space-y-2">
           <Label htmlFor="fullName">Your name</Label>
@@ -119,11 +126,15 @@ export function PurchasePanel({ productSlug }: { productSlug: string }) {
             <Link href="/legal/terms" className="underline">
               Terms & Conditions
             </Link>{" "}
+            and{" "}
+            <Link href="/legal/privacy" className="underline">
+              Privacy notice
+            </Link>{" "}
             on behalf of my organization.
           </Label>
         </div>
         <Button className="w-full" onClick={checkout} disabled={loading || !accepted}>
-          {loading ? "Redirecting to payment…" : `Rent This App for R${RENT_ZAR.toLocaleString("en-ZA")}/mo`}
+          {loading ? "Redirecting to payment…" : `Pay R${quote.amount.toFixed(2)} today`}
         </Button>
         <p className="text-xs text-muted-foreground">
           PayFast or Stripe (ZAR). When payment clears, your multi-tenant workspace is created

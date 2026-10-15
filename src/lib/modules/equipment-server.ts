@@ -1,6 +1,7 @@
 import { randomBytes } from "crypto";
 import { z } from "zod";
 import type { EquipmentCustodyLog, EquipmentIssue, EquipmentItem } from "@/generated/prisma/client";
+import { companyHasApp } from "@/lib/billing";
 import { db } from "@/lib/db";
 import { requireProductApi } from "@/lib/modules/api-guard";
 import { appUrl, jsonList, saDateKey } from "@/lib/modules/common";
@@ -24,7 +25,7 @@ export const newBatch = () => randomBytes(6).toString("hex");
 export const signingUrl = (token: string) => `${appUrl()}/p/equipment/${token}`;
 
 export async function hasLedger(organizationId: string) {
-  return !!(await db.subscription.findFirst({ where: { organizationId, productSlug: LEDGER, status: "active" } }));
+  return companyHasApp(organizationId, LEDGER);
 }
 
 export function serializeItem(i: EquipmentItem) {

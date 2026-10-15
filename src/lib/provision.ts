@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 import { OrgRole } from "@/generated/prisma/client";
 import { TERMS_VERSION } from "@/lib/auth";
 import { slugify } from "@/lib/auth";
+import { grantPaidPeriod } from "@/lib/billing";
 import { db } from "@/lib/db";
 import { createSession } from "@/lib/session";
 
@@ -13,6 +14,8 @@ export async function provisionWorkspaceFromPayment(input: {
   productSlug: string;
   paymentRef?: string;
   provider?: string;
+  payfastToken?: string;
+  organizationId?: string;
   autoLogin?: boolean;
 }) {
   const email = input.email.toLowerCase().trim();
@@ -39,7 +42,7 @@ export async function provisionWorkspaceFromPayment(input: {
         termsAcceptances: { create: { version: TERMS_VERSION } },
         memberships: {
           create: {
-            role: OrgRole.OWNER,
+            role: OrgRole.ADMIN,
             organization: {
               create: {
                 name: input.companyName,
@@ -56,9 +59,11 @@ export async function provisionWorkspaceFromPayment(input: {
     });
     organizationId = user.memberships[0]!.organizationId;
   } else {
-    const membership = user.memberships[0];
-    if (!membership) throw new Error("User has no organization");
-    organizationId = membership.organizationId;
+    const chosen = input.organizationId
+      ? user.memberships.find((membership) => membership.organizationId === input.organizationId)
+      : user.memberships[0];
+    if (!chosen) throw new Error("User has no organization");
+    organizationId = chosen.organizationId;
     const hasTerms = await db.termsAcceptance.findFirst({
       where: { userId: user.id, version: TERMS_VERSION },
     });
@@ -69,23 +74,12 @@ export async function provisionWorkspaceFromPayment(input: {
     }
   }
 
-  await db.subscription.upsert({
-    where: {
-      organizationId_productSlug: {
-        organizationId,
-        productSlug: input.productSlug,
-      },
-    },
-    create: {
-      organizationId,
-      productSlug: input.productSlug,
-      status: "active",
-      stripeSubscriptionId: input.paymentRef,
-    },
-    update: {
-      status: "active",
-      stripeSubscriptionId: input.paymentRef ?? undefined,
-    },
+  await grantPaidPeriod({
+    organizationId,
+    productSlug: input.productSlug,
+    provider: input.provider,
+    paymentRef: input.paymentRef,
+    payfastToken: input.payfastToken,
   });
 
   if (input.autoLogin) {
@@ -93,6 +87,7 @@ export async function provisionWorkspaceFromPayment(input: {
       userId: user.id,
       organizationId,
       email: user.email,
+      sv: user.sessionVersion,
     });
   }
 
@@ -100,6 +95,7 @@ export async function provisionWorkspaceFromPayment(input: {
     userId: user.id,
     organizationId,
     email: user.email,
+    sessionVersion: user.sessionVersion,
     temporaryPassword,
   };
 }

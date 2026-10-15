@@ -20,9 +20,11 @@ export async function POST(req: Request) {
   if ("error" in gate) return gate.error;
   const body = z.object({
     employeeName: z.string().min(2),
+    employeeNumber: z.string().trim().max(40).optional(),
     recordType: z.enum(["loan", "deductible"]),
     amount: z.number().positive(),
     description: z.string().min(2),
+    repaymentNote: z.string().trim().max(500).optional(),
     photoDataUrl: z.string().startsWith("data:image/").optional(),
   }).parse(await req.json());
   let photoUrl: string | undefined;
@@ -33,9 +35,11 @@ export async function POST(req: Request) {
     data: {
       organizationId: gate.session.organizationId,
       employeeName: body.employeeName,
+      employeeNumber: body.employeeNumber || null,
       recordType: body.recordType,
       amount: body.amount,
       description: body.description,
+      repaymentNote: body.repaymentNote || null,
       photoUrl,
     },
   });

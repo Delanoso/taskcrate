@@ -9,29 +9,53 @@ datasource db {
 
 model User {
   id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  fullName     String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  email            String   @unique
+  passwordHash     String
+  fullName         String
+  platformAdmin    Boolean  @default(false)
+  sessionVersion   Int      @default(0)
+  mustSetPassword  Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   memberships      Membership[]
   termsAcceptances TermsAcceptance[]
   notifications    Notification[]
   ipNoticeAcks     IpNoticeAcknowledgement[]
+  supportTickets   SupportTicket[]
+  supportReplies   SupportReply[]
+  passwordResets   PasswordReset[]
+}
+
+model PasswordReset {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Organization {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String    @id @default(cuid())
+  name       String
+  slug       String    @unique
+  phone      String?
+  phoneKey   String?
+  companyKey String?
+  trialEndsAt DateTime?
+  trialNote  String?
+  trialNoticeSent Boolean @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   branding       OrganizationBranding?
   departments    Department[]
   memberships    Membership[]
   subscriptions  Subscription[]
+  trialClaims    TrialClaim[]
   documents      DocumentSequence[]
   notifications  Notification[]
   toolboxTalks   ToolboxTalk[]
@@ -61,6 +85,7 @@ model Organization {
   meterSites     MeterSite[]
   obSites        ObSite[]
   fitSites       FitForDutySite[]
+  supportTickets SupportTicket[]
 }
 
 model OrganizationBranding {
@@ -119,12 +144,26 @@ model Subscription {
   organization         Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   productSlug          String
   status               String       @default("active")
+  currentPeriodEnd     DateTime?
+  provider             String?
+  payfastToken         String?
   stripeCustomerId     String?
   stripeSubscriptionId String?
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
 
   @@unique([organizationId, productSlug])
+}
+
+model TrialClaim {
+  id             String       @id @default(cuid())
+  kind           String
+  value          String
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@unique([kind, value])
 }
 
 model DocumentSequence {
@@ -160,6 +199,32 @@ model IpNoticeAcknowledgement {
   acknowledgedAt DateTime @default(now())
 
   @@unique([userId, productSlug, version])
+}
+
+model SupportTicket {
+  id             String         @id @default(cuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject        String
+  body           String
+  productSlug    String?
+  status         String         @default("open")
+  mailError      String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  replies        SupportReply[]
+}
+
+model SupportReply {
+  id        String        @id @default(cuid())
+  ticketId  String
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  body      String
+  createdAt DateTime      @default(now())
 }
 
 // ——— Toolbox Talks ———
@@ -259,9 +324,13 @@ model VisitorCheckIn {
   siteId        String
   site          VisitorSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
   fullName      String
+  company       String?
+  hostName      String?
   registration  String?
   purpose       String
   phone         String
+  photoUrl      String?
+  signatureUrl  String?
   whatsappSent  Boolean     @default(true)
   deliveryLog   String?
   createdAt     DateTime    @default(now())
@@ -789,9 +858,11 @@ model LoanDeductibleRecord {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   publicToken    String       @unique @default(cuid())
   employeeName   String
+  employeeNumber String?
   recordType     String // loan|deductible
   amount         Float
   description    String
+  repaymentNote  String?
   photoUrl       String?
   signatureData  String?
   status         String       @default("pending")
@@ -805,18 +876,34 @@ model JobCard {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   mode           String // internal|field
+  jobNumber      String?
   title          String
   machineRef     String?
+  location       String?
+  priority       String       @default("normal") // low|normal|urgent
   publicToken    String       @unique @default(cuid())
   description    String?
-  status         String       @default("open") // open|scheduled|in_progress|done
+  status         String       @default("open") // open|scheduled|in_progress|awaiting_signoff|done
+  reportedByName String?
+  reportedByPhone String?
+  openComment    String?
+  openSignature  String?
+  openSignedAt   DateTime?
+  photosJson     String? // [{url, side: open|work}]
   mechanicName   String?
+  workComment    String?
+  technicianSignature String?
+  technicianSignedAt DateTime?
   downtimeHours  Float?
   partsCost      Float?
   partsJson      String? // [{name,qty,cost}]
   hoursWorked    Float?
   clientName     String?
   clientSignature String?
+  acceptComment  String?
+  acceptedAt     DateTime?
+  startedAt      DateTime?
+  completedAt    DateTime?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 }
@@ -828,6 +915,9 @@ model StockItem {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name           String
   sku            String?
+  unit           String       @default("each")
+  location       String?
+  supplier       String?
   quantity       Int          @default(0)
   reorderAt      Int          @default(5)
   publicToken    String       @unique @default(cuid())
@@ -836,12 +926,23 @@ model StockItem {
 }
 
 model StockMovement {
-  id        String    @id @default(cuid())
-  itemId    String
-  item      StockItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  delta     Int
-  note      String?
-  createdAt DateTime  @default(now())
+  id                String    @id @default(cuid())
+  itemId            String
+  item              StockItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  kind              String    @default("legacy") // issue|receive|return|adjust|legacy
+  quantity          Int       @default(0)
+  delta             Int
+  balanceAfter      Int?
+  partyName         String?
+  partySignature    String?
+  loggedByName      String?
+  loggedBySignature String?
+  jobRef            String?
+  note              String?
+  reason            String?
+  createdAt         DateTime  @default(now())
+
+  @@index([itemId])
 }
 
 // ——— Pre-Trip / Handover ———
@@ -851,24 +952,40 @@ model Vehicle {
   organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name           String
   regNumber      String
+  make           String?
   publicToken    String            @unique @default(cuid())
   createdAt      DateTime          @default(now())
   trips          VehicleTripLog[]
 }
 
 model VehicleTripLog {
-  id              String   @id @default(cuid())
-  vehicleId       String
-  vehicle         Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  driverName      String
-  startKm         Int
-  endKm           Int?
-  checklistJson   String
-  photoUrlsJson   String? // up to 4 panel photos
-  handoverFrom    String?
-  handoverTo      String?
-  varianceFlag    Boolean  @default(false)
-  createdAt       DateTime @default(now())
+  id                     String    @id @default(cuid())
+  vehicleId              String
+  vehicle                Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  driverName             String
+  licenceNo              String?
+  site                   String?
+  startKm                Int
+  endKm                  Int?
+  endDriverName          String?
+  checklistJson          String
+  faultNote              String?
+  photoUrlsJson          String?
+  driverSignature        String?
+  endSignature           String?
+  endNote                String?
+  handoverFrom           String?
+  handoverTo             String?
+  handoverFromSignature  String?
+  handoverToSignature    String?
+  handoverKm             Int?
+  handoverNote           String?
+  handoverAt             DateTime?
+  endedAt                DateTime?
+  varianceFlag           Boolean   @default(false)
+  createdAt              DateTime  @default(now())
+
+  @@index([vehicleId])
 }
 
 // ——— Meter Variance ———
@@ -878,20 +995,42 @@ model MeterSite {
   organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name           String
   meterType      String // water|electricity
+  meterNumber    String?
+  accountNumber  String?
+  municipality   String?
+  location       String?
+  unit           String         @default("kL")
   alertThreshold Float          @default(1.5) // multiplier vs baseline
   alertPhone     String?
+  publicToken    String         @unique @default(cuid())
   createdAt      DateTime       @default(now())
   readings       MeterReading[]
 }
 
 model MeterReading {
-  id        String    @id @default(cuid())
-  siteId    String
-  site      MeterSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  reading   Float
-  occupancy Int       @default(0)
-  alerted   Boolean   @default(false)
-  createdAt DateTime  @default(now())
+  id               String    @id @default(cuid())
+  siteId           String
+  site             MeterSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  reading          Float
+  occupancy        Int       @default(0)
+  alerted          Boolean   @default(false)
+  readerName       String    @default("")
+  readerSignature  String?
+  photoUrl         String?
+  extraPhotoUrl    String?
+  note             String?
+  previousReading  Float?
+  usage            Float?
+  baseline         Float?
+  varianceNote     String?
+  checkedByName    String?
+  checkedSignature String?
+  checkedAt        DateTime?
+  checkNote        String?
+  checkPhotoUrl    String?
+  createdAt        DateTime  @default(now())
+
+  @@index([siteId])
 }
 
 // ——— Digital OB ———
@@ -900,6 +1039,7 @@ model ObSite {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name           String
+  location       String?
   publicToken    String    @unique @default(cuid())
   wakeMinutes    Int       @default(60)
   guardPhone     String?
@@ -909,14 +1049,25 @@ model ObSite {
 }
 
 model ObEntry {
-  id        String   @id @default(cuid())
-  siteId    String
-  site      ObSite   @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  category  String
-  notes     String?
-  lat       Float?
-  lng       Float?
-  createdAt DateTime @default(now())
+  id                   String   @id @default(cuid())
+  siteId               String
+  site                 ObSite   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  entryNumber          String   @default("")
+  category             String
+  notes                String?
+  people               String?
+  actionTaken          String?
+  guardName            String   @default("")
+  guardSignature       String?
+  photoUrl             String?
+  extraPhotoUrl        String?
+  handoverToName       String?
+  handoverToSignature  String?
+  lat                  Float?
+  lng                  Float?
+  createdAt            DateTime @default(now())
+
+  @@index([siteId])
 }
 
 // ——— Fit for Duty ———
@@ -925,18 +1076,26 @@ model FitForDutySite {
   organizationId String
   organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name           String
+  location       String?
   publicToken    String              @unique @default(cuid())
   createdAt      DateTime            @default(now())
   checks         FitForDutyCheck[]
 }
 
 model FitForDutyCheck {
-  id            String         @id @default(cuid())
-  siteId        String
-  site          FitForDutySite @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  employeeName  String
-  reactionMs    Int
-  ppeConfirmed  Boolean
-  status        String // VERIFIED_READY|FAILED|SKIPPED
-  createdAt     DateTime       @default(now())
+  id             String         @id @default(cuid())
+  siteId         String
+  site           FitForDutySite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  employeeName   String
+  employeeNumber String?
+  reactionMs     Int
+  ppeConfirmed   Boolean
+  ppeJson        String?
+  photoUrl       String?
+  signatureUrl   String?
+  note           String?
+  status         String // VERIFIED_READY|FAILED|SKIPPED
+  createdAt      DateTime       @default(now())
+
+  @@index([siteId])
 }

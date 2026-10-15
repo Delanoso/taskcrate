@@ -1,6 +1,7 @@
 import { cookies, headers } from "next/headers";
 import type { NextResponse } from "next/server";
 import { SignJWT, jwtVerify } from "jose";
+import { db } from "@/lib/db";
 import { LEGACY_SESSION_COOKIE as SESSION_COOKIE } from "@/lib/session-cookies";
 
 export { HOST_SESSION_COOKIE, LEGACY_SESSION_COOKIE } from "@/lib/session-cookies";
@@ -9,6 +10,8 @@ export type SessionPayload = {
   userId: string;
   organizationId: string;
   email: string;
+  /** Bumped when the password changes so older logins stop working. Missing means 0. */
+  sv: number;
 };
 
 export function getSessionSecret() {
@@ -41,7 +44,15 @@ export async function signSessionToken(payload: SessionPayload) {
 export async function verifySessionToken(token: string): Promise<SessionPayload | null> {
   try {
     const { payload } = await jwtVerify(token, getSessionSecret());
-    return payload as SessionPayload;
+    if (typeof payload.userId !== "string" || typeof payload.organizationId !== "string") return null;
+    if (typeof payload.email !== "string") return null;
+    const sv = typeof payload.sv === "number" ? payload.sv : 0;
+    return {
+      userId: payload.userId,
+      organizationId: payload.organizationId,
+      email: payload.email,
+      sv,
+    };
   } catch {
     return null;
   }
@@ -106,7 +117,14 @@ export async function getSession(): Promise<SessionPayload | null> {
     jar.get("__Host-delano_session")?.value,
   );
   if (!token) return null;
-  return verifySessionToken(token);
+  const payload = await verifySessionToken(token);
+  if (!payload) return null;
+  const user = await db.user.findUnique({
+    where: { id: payload.userId },
+    select: { sessionVersion: true },
+  });
+  if (!user || user.sessionVersion !== payload.sv) return null;
+  return payload;
 }
 
 export async function clearSession() {

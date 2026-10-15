@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { companyHasApp } from "@/lib/billing";
 import { db } from "@/lib/db";
 import { requireProductApi } from "@/lib/modules/api-guard";
 import { companyName, parseBody } from "@/lib/modules/common";
@@ -11,7 +12,7 @@ export async function GET() {
   const orgId = gate.session.organizationId;
   const [packets, leave] = await Promise.all([
     db.onboardingPacket.findMany({ where: { organizationId: orgId }, include: { documents: true }, orderBy: { createdAt: "desc" } }),
-    db.subscription.findFirst({ where: { organizationId: orgId, productSlug: "leave-planner", status: "active" } }),
+    companyHasApp(orgId, "leave-planner"),
   ]);
   return NextResponse.json({
     company: await companyName(orgId),

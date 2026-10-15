@@ -1,5 +1,12 @@
 /** Standby-gate bubble check. One bubble at a time, in a random place, for a short life. */
 
+export const FIT_PPE = [
+  { key: "helmet", label: "Hard hat" },
+  { key: "boots", label: "Safety boots" },
+  { key: "vest", label: "High-vis vest" },
+  { key: "eyes", label: "Eye protection" },
+] as const;
+
 export const FIT_BUBBLES = 8;
 export const FIT_LIFE_MS = 1600;
 /** An alert person can miss a couple. Three or more is a fail. */

@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; reset?: string }>;
 }) {
   const sp = await searchParams;
 
@@ -14,7 +14,7 @@ export default async function LoginPage({
       <div className="w-full max-w-md rounded-xl border bg-card p-6 text-card-foreground shadow-sm">
         <h1 className="text-xl font-semibold tracking-tight">Sign in to your workspace</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          One login for every Delano module your company subscribes to.
+          One login for every TaskCrate app your company subscribes to.
         </p>
 
         {/* Fully native controls — no Base UI (Safari form name/submit bugs) */}
@@ -45,6 +45,14 @@ export default async function LoginPage({
               className="h-10 w-full rounded-lg border border-input bg-background px-3 text-base"
             />
           </div>
+          <p className="text-right text-sm">
+            <Link href="/forgot-password" className="text-muted-foreground underline">
+              Forgot password?
+            </Link>
+          </p>
+          {sp.reset ? (
+            <p className="text-sm text-foreground">Password updated. Sign in with the new password.</p>
+          ) : null}
           {sp.error ? <p className="text-sm text-red-600">{sp.error}</p> : null}
           <button
             type="submit"
@@ -57,10 +65,10 @@ export default async function LoginPage({
         <p className="mt-4 text-center text-sm text-muted-foreground">
           New here?{" "}
           <Link href="/register" className="text-foreground underline">
-            Register and accept terms
+            Start a 7-day trial
           </Link>
         </p>
-        <p className="mt-3 text-center text-[10px] text-muted-foreground/70">auth-build 2026-10-12i</p>
+        <p className="mt-3 text-center text-[10px] text-muted-foreground/70">auth-build 2026-10-14a</p>
       </div>
     </div>
   );

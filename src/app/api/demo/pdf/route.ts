@@ -10,7 +10,7 @@ export async function GET() {
     organizationId: session.organizationId,
     documentTitle: "Sample branded export",
     bodyLines: [
-      "This PDF demonstrates the shared header and footer used by every Delano module.",
+      "This PDF demonstrates the shared header and footer used by every TaskCrate module.",
       "Header: document title + your company name (logo URL supported in production uploads).",
       "Footer: created date, document number, and company display name.",
       "Brand colours from your workspace settings are applied to headings.",

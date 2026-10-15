@@ -1,14 +1,38 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import bcrypt from "bcryptjs";
 import { OrgRole } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { canManageTeam, defaultProductAccessForRole } from "@/lib/rbac";
+import { publicOrigin } from "@/lib/public-origin";
+import { isPlatformAdmin } from "@/lib/platform-admin";
+import { canInviteUsers, isCompanyAdmin } from "@/lib/rbac";
 import { getSession } from "@/lib/session";
+import { inviteTeamMember } from "@/lib/team-invite";
+
+async function requirePeopleAdmin(session: { userId: string; organizationId: string }) {
+  const account = await db.user.findUnique({
+    where: { id: session.userId },
+    select: { email: true, platformAdmin: true },
+  });
+  if (isPlatformAdmin(account)) return { ok: true as const };
+
+  const actor = await db.membership.findUnique({
+    where: {
+      userId_organizationId: {
+        userId: session.userId,
+        organizationId: session.organizationId,
+      },
+    },
+  });
+  if (!actor || !canInviteUsers(actor.role)) return { ok: false as const };
+  return { ok: true as const };
+}
 
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await requirePeopleAdmin(session)).ok) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const members = await db.membership.findMany({
     where: { organizationId: session.organizationId },
@@ -34,70 +58,93 @@ export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const actor = await db.membership.findUniqueOrThrow({
-    where: {
-      userId_organizationId: {
-        userId: session.userId,
-        organizationId: session.organizationId,
-      },
-    },
-  });
-
-  if (!canManageTeam(actor.role)) {
+  if (!(await requirePeopleAdmin(session)).ok) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const body = inviteSchema.parse(await req.json());
-  if (body.role === OrgRole.OWNER && actor.role !== OrgRole.OWNER) {
-    return NextResponse.json({ error: "Only owners can assign owner role" }, { status: 403 });
+  if (body.role !== OrgRole.ADMIN && body.role !== OrgRole.MEMBER) {
+    return NextResponse.json({ error: "Choose Admin, or choose the apps they can open." }, { status: 400 });
   }
 
-  const tempPassword = crypto.randomUUID().slice(0, 12);
-  const passwordHash = await bcrypt.hash(tempPassword, 12);
+  const [org, inviter] = await Promise.all([
+    db.organization.findUnique({
+      where: { id: session.organizationId },
+      include: { branding: true },
+    }),
+    db.user.findUnique({ where: { id: session.userId }, select: { fullName: true } }),
+  ]);
+  if (!org || !inviter) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const productAccess =
-    body.productSlugs !== undefined
-      ? JSON.stringify(body.productSlugs)
-      : defaultProductAccessForRole(body.role) === null
-        ? null
-        : JSON.stringify(defaultProductAccessForRole(body.role));
+    body.role === OrgRole.ADMIN
+      ? null
+      : JSON.stringify(body.productSlugs ?? []);
 
-  const user = await db.user.upsert({
-    where: { email: body.email.toLowerCase() },
-    create: {
-      email: body.email.toLowerCase(),
-      fullName: body.fullName,
-      passwordHash,
-      termsAcceptances: { create: { version: "2026-10-12-v1" } },
-    },
-    update: {},
+  const result = await inviteTeamMember({
+    organizationId: session.organizationId,
+    organizationName: org.branding?.displayName || org.name,
+    inviterName: inviter.fullName,
+    email: body.email,
+    fullName: body.fullName,
+    role: body.role,
+    departmentId: body.departmentId,
+    productAccess,
+    origin: publicOrigin(req),
   });
 
-  await db.membership.upsert({
-    where: {
-      userId_organizationId: {
-        userId: user.id,
-        organizationId: session.organizationId,
-      },
-    },
-    create: {
-      userId: user.id,
-      organizationId: session.organizationId,
-      role: body.role,
-      departmentId: body.departmentId,
-      productAccess,
-    },
-    update: {
-      role: body.role,
-      departmentId: body.departmentId,
-      productAccess,
-    },
-  });
+  if (!result.ok) return NextResponse.json({ error: result.error }, { status: 502 });
 
   return NextResponse.json({
     ok: true,
-    temporaryPassword: tempPassword,
-    message:
-      "In production, send a secure invite email instead of returning a password. This demo returns a one-time password for local testing.",
+    kind: result.kind,
+    devLink:
+      process.env.NODE_ENV === "development" && result.kind === "invited" ? result.devLink : undefined,
   });
+}
+
+const accessSchema = z.object({
+  membershipId: z.string().min(1),
+  role: z.enum([OrgRole.ADMIN, OrgRole.MEMBER]),
+  productSlugs: z.array(z.string()).optional(),
+});
+
+export async function PATCH(req: Request) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  if (!(await requirePeopleAdmin(session)).ok) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const body = accessSchema.parse(await req.json());
+  const membership = await db.membership.findFirst({
+    where: { id: body.membershipId, organizationId: session.organizationId },
+  });
+  if (!membership) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  if (membership.userId === session.userId && body.role === OrgRole.MEMBER) {
+    return NextResponse.json({ error: "You cannot remove your own admin access." }, { status: 400 });
+  }
+  if (body.role === OrgRole.MEMBER && isCompanyAdmin(membership.role)) {
+    const admins = await db.membership.count({
+      where: {
+        organizationId: session.organizationId,
+        role: { in: [OrgRole.OWNER, OrgRole.ADMIN] },
+      },
+    });
+    if (admins <= 1) {
+      return NextResponse.json({ error: "The company needs at least one admin." }, { status: 400 });
+    }
+  }
+
+  await db.membership.update({
+    where: { id: membership.id },
+    data: {
+      role: body.role === OrgRole.ADMIN && membership.role === OrgRole.OWNER ? OrgRole.OWNER : body.role,
+      productAccess: body.role === OrgRole.ADMIN ? null : JSON.stringify(body.productSlugs ?? []),
+    },
+  });
+
+  return NextResponse.json({ ok: true });
 }

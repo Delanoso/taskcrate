@@ -10,16 +10,16 @@ export default function HomePage() {
   return (
     <>
       <section className="relative overflow-hidden border-b">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,oklch(0.93_0.04_250),transparent_55%)]" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,oklch(0.86_0.07_250),transparent_58%)]" />
         <div className="relative mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-28">
-          <p className="text-sm font-medium text-primary">Delano Solutions</p>
+          <p className="text-sm font-medium text-primary">TaskCrate</p>
           <h1 className="mt-3 max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl">
             Rent premium ops apps for {formatRentLabel()}.
           </h1>
           <p className="mt-5 max-w-2xl text-lg text-muted-foreground">
-            Browse every app profile with no sign-in. Tap the phone sandbox, feel the workflow, then
-            rent with one-click PayFast or Stripe — your workspace provisions on autopilot when
-            payment clears.
+            Browse every app with no sign-in. Register for a 7-day trial of all of them, with no card.
+            After that, the first payment covers only the days left in the month, then the full rent
+            runs on the 1st.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button size="lg" asChild>
@@ -28,20 +28,20 @@ export default function HomePage() {
               </a>
             </Button>
             <Button size="lg" variant="outline" asChild>
-              <Link href="/login">Sign in to workspace</Link>
+              <Link href="/register">Start 7-day trial</Link>
             </Button>
           </div>
           <dl className="mt-14 grid gap-6 sm:grid-cols-3">
             {[
               {
                 icon: Layers,
-                title: "No account to browse",
-                text: "Open any profile and play the interactive phone demo instantly.",
+                title: "7-day trial, no card",
+                text: "Register once and use every app for 7 days. One trial per company and cellphone number.",
               },
               {
                 icon: Shield,
-                title: "R1,000/mo per app",
-                text: `Flat rent ${formatRentLabel()}. One dashboard if you take several.`,
+                title: "Billed together on the 1st",
+                text: "The first charge is only the days left this month. From the 1st, every app is R1 000.",
               },
               {
                 icon: Sparkles,

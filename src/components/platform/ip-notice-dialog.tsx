@@ -44,7 +44,7 @@ export function IpNoticeDialog({ productSlug, productName, openInitially }: Prop
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent showCloseButton={false} className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Delano Solutions — proprietary software</DialogTitle>
+          <DialogTitle>TaskCrate — proprietary software</DialogTitle>
           <DialogDescription>
             Before using {productName}, please confirm you understand the license terms.
           </DialogDescription>

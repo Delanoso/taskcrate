@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Button, Input } from "@/components/modules/ui-bits";
+import { PhotoInput } from "@/components/modules/photo-input";
+import { SignaturePad } from "@/components/platform/signature-pad";
 
 type Mode = "in" | "out";
 
@@ -9,7 +11,9 @@ export default function Page() {
   const { token } = useParams<{ token: string }>();
   const [site, setSite] = useState<any>(null);
   const [mode, setMode] = useState<Mode>("in");
-  const [form, setForm] = useState({ fullName: "", registration: "", purpose: "", phone: "" });
+  const [form, setForm] = useState({ fullName: "", company: "", hostName: "", registration: "", purpose: "", phone: "" });
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [signature, setSignature] = useState<string | null>(null);
   const [outPhone, setOutPhone] = useState("");
   const [wa, setWa] = useState<string | null>(null);
   const [leftName, setLeftName] = useState<string | null>(null);
@@ -37,7 +41,15 @@ export default function Page() {
 
   async function checkIn(e: React.FormEvent) {
     e.preventDefault();
-    const data = await post("", form);
+    if (!photo) {
+      setError("Add a photo.");
+      return;
+    }
+    if (!signature) {
+      setError("Sign to confirm you have read the site rules.");
+      return;
+    }
+    const data = await post("", { ...form, photo, signature });
     if (data) setWa(data.whatsAppUrl);
   }
 
@@ -84,11 +96,25 @@ export default function Page() {
       {mode === "in" ? (
         <form onSubmit={checkIn} className="space-y-3">
           <Input placeholder="Full name" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} required />
+          <Input placeholder="Company" value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} />
+          <Input placeholder="Person you are visiting" value={form.hostName} onChange={(e) => setForm({ ...form, hostName: e.target.value })} required />
           <Input placeholder="Vehicle reg (optional)" value={form.registration} onChange={(e) => setForm({ ...form, registration: e.target.value })} />
           <Input placeholder="Purpose" value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} required />
           <Input type="tel" placeholder="WhatsApp number" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required />
+          <PhotoInput label="Photo" onChange={setPhoto} />
+          {site.protocolText && (
+            <div className="rounded-md border bg-muted/40 p-3 text-sm">
+              <p className="mb-1 font-medium">Site rules</p>
+              <p className="whitespace-pre-wrap text-muted-foreground">{site.protocolText}</p>
+            </div>
+          )}
+          <div>
+            <p className="mb-1 text-sm font-medium">Signature</p>
+            <p className="mb-2 text-xs text-muted-foreground">Sign to confirm you have read the site rules. The arrival time is saved with this signature.</p>
+            <SignaturePad onChange={setSignature} />
+          </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
-          <Button type="submit" className="w-full" disabled={busy}>{busy ? "Checking in…" : "Check in"}</Button>
+          <Button type="submit" className="w-full" disabled={busy}>{busy ? "Checking in…" : "Sign and check in"}</Button>
         </form>
       ) : (
         <form onSubmit={checkOut} className="space-y-3">

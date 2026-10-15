@@ -5,6 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PurchasePanel } from "@/components/platform/purchase-panel";
 import { PhoneSandbox } from "@/components/marketing/phone-sandbox";
+import { db } from "@/lib/db";
+import { isPlatformAdmin } from "@/lib/platform-admin";
+import { isCompanyAdmin } from "@/lib/rbac";
+import { getSession } from "@/lib/session";
 
 export function generateStaticParams() {
   return PRODUCTS.map((p) => ({ slug: p.slug }));
@@ -19,10 +23,34 @@ export default async function ProductDetailPage({
   const product = getProduct(slug);
   if (!product) notFound();
 
+  const session = await getSession();
+  let canAdd = !session;
+  if (session) {
+    const account = await db.user.findUnique({
+      where: { id: session.userId },
+      select: { email: true, platformAdmin: true },
+    });
+    if (isPlatformAdmin(account)) {
+      canAdd = true;
+    } else {
+      const membership = await db.membership.findUnique({
+        where: {
+          userId_organizationId: {
+            userId: session.userId,
+            organizationId: session.organizationId,
+          },
+        },
+        select: { role: true },
+      });
+      canAdd = !!membership && isCompanyAdmin(membership.role);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
       <p className="text-sm text-muted-foreground">
-        No sign-in required to browse · Tap the phone demo · Rent when ready
+        Register for a 7-day trial of every app, or rent one when you are ready. First payment covers the
+        days left this month, then R1 000 on the 1st.
       </p>
       <div className="mt-6 grid gap-10 lg:grid-cols-[1fr_340px_360px]">
         <div>
@@ -59,7 +87,13 @@ export default async function ProductDetailPage({
         </div>
 
         <div className="lg:sticky lg:top-24 lg:self-start">
-          <PurchasePanel productSlug={product.slug} />
+          {canAdd ? (
+            <PurchasePanel productSlug={product.slug} />
+          ) : (
+            <p className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">
+              An admin adds monthly apps for the company.
+            </p>
+          )}
           <Button variant="link" asChild className="mt-4 px-0">
             <Link href="/products">← Back to catalog</Link>
           </Button>
