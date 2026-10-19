@@ -89,6 +89,8 @@ export async function alertCompany(organizationId: string, input: { productSlug:
 
 /** Same email to every owner/admin, each greeted by first name. Returns how many were sent. */
 export async function emailCompanyAdmins(organizationId: string, input: { subject: string; kind: string } & Omit<EmailContent, "greeting">) {
+  const org = await db.organization.findUnique({ where: { id: organizationId }, select: { slug: true } });
+  if (org?.slug === "taskcrate-demo") return 0;
   let sent = 0;
   for (const admin of await companyAdmins(organizationId)) {
     const r = await sendEmail({ ...input, organizationId, to: admin.email, greeting: `Hi ${admin.fullName.split(" ")[0]},` });

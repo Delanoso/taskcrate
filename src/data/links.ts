@@ -49,6 +49,40 @@ export function activePairs(slugs: string[], owned: string[] = []) {
   return APP_PAIRS.filter((pair) => have.has(pair.a) && have.has(pair.b) && (slugs.includes(pair.a) || slugs.includes(pair.b)));
 }
 
+export type StarterPack = { id: string; name: string; forWho: string; slugs: string[] };
+
+/** The four ways a company starts. Every app in a pack is R800 because its partner is in the same pack. */
+export const STARTER_PACKS: StarterPack[] = [
+  {
+    id: "site",
+    name: "Site",
+    forWho: "The gate. Attendance, tickets, a fit check, and the permit. An expired ticket or a failed fit check stops clock-in and the permit.",
+    slugs: ["site-attendance", "training-tickets", "fit-for-duty", "permit-to-work"],
+  },
+  {
+    id: "workshop",
+    name: "Workshop",
+    forWho: "The workshop. A job card, the parts on the shelf, and the bakkie's walk-around. A fault opens a job. Parts leave the shelf when the job closes.",
+    slugs: ["job-card-internal", "workshop-consumables", "pretrip-handover"],
+  },
+  {
+    id: "people",
+    name: "People",
+    forWho: "Hire to pay. The onboarding pack becomes a person on leave. A signed AOD deducts on the payslip.",
+    slugs: ["onboard-docs", "leave-planner", "payroll", "loan-deductible-ledger"],
+  },
+  {
+    id: "money",
+    name: "Money",
+    forWho: "Money in and money out. Quotes and invoices on one side, supplier bills on the other.",
+    slugs: ["quotations", "bills-to-pay"],
+  },
+];
+
+export function packById(id: string) {
+  return STARTER_PACKS.find((pack) => pack.id === id);
+}
+
 export function basketTotals(slugs: string[], owned: string[], daysLeft: number, daysInMonth: number) {
   const have = [...slugs, ...owned];
   const prices = slugs.map((slug) => priceOf(slug, have));

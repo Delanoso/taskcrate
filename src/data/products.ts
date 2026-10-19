@@ -22,7 +22,7 @@ export type ProductDefinition = {
  * Full TaskCrate catalog. Each app states the problem it solves.
  * Each app rents for R1,000/mo on its own. A linked pair is R800 each.
  */
-export const PRODUCTS: ProductDefinition[] = [
+const CATALOG: ProductDefinition[] = [
   // —— Health & Safety ——
   {
     slug: "permit-to-work",
@@ -545,6 +545,42 @@ export const PRODUCTS: ProductDefinition[] = [
     hasDateReminders: true,
   },
 ];
+
+/** The order a buyer meets the apps: the safety file, then hire-to-pay, then the gate, the workshop, and the money. */
+const BUYER_ORDER = [
+  "permit-to-work",
+  "toolbox-talks",
+  "site-visitor",
+  "near-miss-whisperer",
+  "accident-report",
+  "ohsa-mock-auditor",
+  "contractor-safety-file",
+  "onboard-docs",
+  "leave-planner",
+  "training-tickets",
+  "payroll",
+  "loan-deductible-ledger",
+  "discipline-log",
+  "contract-sentinel",
+  "equipment-issuer",
+  "equipment-handback",
+  "site-attendance",
+  "fit-for-duty",
+  "job-card-internal",
+  "workshop-consumables",
+  "pretrip-handover",
+  "job-card-field",
+  "quotations",
+  "bills-to-pay",
+  "meter-variance",
+  "digital-ob",
+];
+
+export const PRODUCTS: ProductDefinition[] = BUYER_ORDER.map((slug) => {
+  const product = CATALOG.find((item) => item.slug === slug);
+  if (!product) throw new Error(`Missing product ${slug}`);
+  return product;
+});
 
 export const RENT_ZAR = 1000;
 

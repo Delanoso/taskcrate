@@ -2,8 +2,8 @@ import Link from "next/link";
 import { ArrowRight, Layers, Shield, Sparkles } from "lucide-react";
 import { ProductCard } from "@/components/platform/product-card";
 import { Button } from "@/components/ui/button";
-import { APP_PAIRS, PAIR_ZAR } from "@/data/links";
-import { getProduct, productsByCategory, formatRentLabel } from "@/data/products";
+import { APP_PAIRS, PAIR_ZAR, STARTER_PACKS, basketTotals } from "@/data/links";
+import { RENT_ZAR, getProduct, productsByCategory, formatRentLabel } from "@/data/products";
 
 const NEW_APPS: [string, string | null][] = [
   ["bills-to-pay", "Photograph a supplier invoice, set the due date, and get an email when it is still unpaid."],
@@ -38,8 +38,8 @@ export default function HomePage() {
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button size="lg" asChild>
-              <a href="#apps">
-                See all apps <ArrowRight className="ml-2 h-4 w-4" />
+              <a href="#packs">
+                Start with a pack <ArrowRight className="ml-2 h-4 w-4" />
               </a>
             </Button>
             <Button size="lg" variant="outline" asChild>
@@ -71,6 +71,42 @@ export default function HomePage() {
               </div>
             ))}
           </dl>
+        </div>
+      </section>
+
+      <section id="packs" className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+        <h2 className="text-2xl font-semibold tracking-tight">Start with a pack</h2>
+        <p className="mt-1 max-w-2xl text-muted-foreground">
+          Pick the part of the business you want online first. Every app in a pack is R{PAIR_ZAR.toLocaleString("en-ZA")} a month because it writes into another app in the same pack. On its own, each app is still R{RENT_ZAR.toLocaleString("en-ZA")}.
+        </p>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          {STARTER_PACKS.map((pack) => {
+            const monthly = basketTotals(pack.slugs, [], 1, 1).monthly;
+            const alone = pack.slugs.length * RENT_ZAR;
+            return (
+              <div key={pack.id} className="rounded-xl border bg-card p-5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <h3 className="text-lg font-medium">{pack.name}</h3>
+                  <p className="text-sm font-medium">R{monthly.toLocaleString("en-ZA")}/mo</p>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">{pack.forWho}</p>
+                <ul className="mt-3 space-y-1 text-sm">
+                  {pack.slugs.map((slug) => {
+                    const product = getProduct(slug);
+                    return product ? (
+                      <li key={slug}>
+                        <Link href={`/products/${slug}`} className="underline">{product.name}</Link>
+                      </li>
+                    ) : null;
+                  })}
+                </ul>
+                <p className="mt-3 text-xs text-muted-foreground">R{alone.toLocaleString("en-ZA")} if you rent them separately.</p>
+                <Button className="mt-4" asChild>
+                  <Link href={`/login?next=${encodeURIComponent(`/dashboard/billing?pack=${pack.id}`)}`}>Rent this pack</Link>
+                </Button>
+              </div>
+            );
+          })}
         </div>
       </section>
 

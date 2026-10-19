@@ -24,10 +24,10 @@ type Data = {
 const R = (n: number) => `R ${n.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const day = (iso: string) => new Date(iso.length === 10 ? `${iso}T12:00:00` : iso).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" });
 
-export function BillingManager({ notice, preselect = null }: { notice: "paid" | "cancelled" | "card" | null; preselect?: string | null }) {
+export function BillingManager({ notice, preselect = [] }: { notice: "paid" | "cancelled" | "card" | null; preselect?: string[] }) {
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [picked, setPicked] = useState<string[]>(preselect ? [preselect] : []);
+  const [picked, setPicked] = useState<string[]>(preselect);
   const [busy, setBusy] = useState<string | null>(null);
   const [openedAt] = useState(() => Date.now());
 

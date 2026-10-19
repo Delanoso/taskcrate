@@ -27,6 +27,9 @@ export default async function DashboardPage({
       activePath="/dashboard"
       accessibleSlugs={accessible.map((p) => p.slug)}
     >
+      {org.slug === "taskcrate-demo" && (
+        <p className="mb-4 rounded-lg border bg-card px-4 py-3 text-sm">Sample company for sales calls. The records are examples. This company is not a paying customer, and it does not send the morning emails.</p>
+      )}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Welcome back, {user.fullName}</h1>
