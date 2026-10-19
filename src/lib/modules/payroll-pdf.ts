@@ -78,3 +78,40 @@ export async function buildPayslipPdf(organizationId: string, lineId: string) {
   if (line.note) doc.paragraph(line.note);
   return { bytes: await doc.finish(), fileName: `Payslip ${line.fullName} ${line.run.period}` };
 }
+
+/** Figures the company types into the EMP201. TaskCrate does not submit the return. */
+export async function buildPayrollPackPdf(organizationId: string, period: string) {
+  const run = await db.payrollRun.findUnique({
+    where: { organizationId_period: { organizationId, period } },
+    include: { lines: true },
+  });
+  if (!run || !run.lines.length) throw new PayrollError("Calculate this month first");
+  const lines = run.lines;
+  const sum = (pick: (line: (typeof lines)[number]) => number) => lines.reduce((total, line) => total + pick(line), 0);
+  const paye = sum((line) => line.payeCents);
+  const uifEmployee = sum((line) => line.uifEmployeeCents);
+  const uifEmployer = sum((line) => line.uifEmployerCents);
+  const sdl = sum((line) => line.sdlCents);
+  const [profile, employer] = await Promise.all([
+    db.payrollProfile.findUnique({ where: { organizationId } }),
+    companyName(organizationId),
+  ]);
+  const doc = await createBrandedDocument({ organizationId, title: "Figures for the EMP201", documentNumber: `EMP201-${period}` });
+  doc.heading(employer);
+  doc.field("PAYE reference", profile?.payeNumber);
+  doc.field("UIF reference", profile?.uifNumber);
+  if (profile?.paySdl) doc.field("SDL reference", profile.sdlNumber);
+  doc.field("Period", pretty(period));
+  doc.field("Pay date", pretty(run.payDate));
+  doc.field("Payslips", String(lines.length));
+  doc.paragraph("These are the figures for the EMP201. TaskCrate does not submit this return to SARS. Type them into eFiling yourself, then pay SARS from your bank.");
+  doc.heading("Amounts for the return");
+  doc.field("PAYE", formatRand(paye));
+  doc.field("UIF from staff", formatRand(uifEmployee));
+  doc.field("UIF from the company", formatRand(uifEmployer));
+  doc.field("Skills development levy", formatRand(sdl));
+  doc.field("Total to pay SARS", formatRand(paye + uifEmployee + uifEmployer + sdl));
+  doc.field("Net pay to transfer to staff", formatRand(sum((line) => line.netCents)));
+  doc.paragraph("The bank file lists each person's account and net pay. A person with no account number is marked so the payment is not sent blind.");
+  return { bytes: await doc.finish(), fileName: `EMP201 figures ${period}` };
+}

@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { alertCompany } from "@/lib/email";
 import { parsePayrollRows, type PayrollImportRow } from "@/lib/modules/payroll-import";
-import { calculatePayslip, dobFromSaId, payDateFor, randsToCents } from "@/lib/modules/payroll-tax";
+import { calculatePayslip, dobFromSaId, formatRand, payDateFor, randsToCents } from "@/lib/modules/payroll-tax";
 import { aodDeductionsFor, matchDeductions, recordPayrollDeductions, reversePayrollDeductions } from "@/lib/modules/aod-payroll";
 import { attendanceHoursForPeriod, type ClockBucket } from "@/lib/modules/attendance-hours";
 
@@ -335,20 +336,36 @@ export async function finalisePayroll(organizationId: string, period: string) {
     where: { organizationId_period: { organizationId, period } },
     include: { lines: true },
   });
-  if (!run) throw new PayrollError("Calculate this month first");
-  if (!run.lines.length) throw new PayrollError("Calculate this month first");
-  const incomplete = run.lines.filter((line) => !line.taxNumber || !line.accountNumber);
+  if (!run || !run.lines.length) throw new PayrollError("Calculate this month first");
+  const lines = run.lines;
+  const incomplete = lines.filter((line) => !line.taxNumber || !line.accountNumber);
   if (incomplete.length) {
     throw new PayrollError(
       `Add the tax number and bank account for ${incomplete.map((line) => line.fullName).join(", ")}. Then calculate again.`,
     );
   }
-  const short = run.lines.filter((line) => line.netCents < 0);
+  const short = lines.filter((line) => line.netCents < 0);
   if (short.length) {
     throw new PayrollError(`Deductions are higher than the pay for ${short.map((line) => line.fullName).join(", ")}.`);
   }
   const finalised = await db.payrollRun.update({ where: { id: run.id }, data: { status: "FINALISED", finalisedAt: new Date() } });
-  const staff = await db.payrollEmployee.findMany({ where: { id: { in: run.lines.filter((l) => l.otherDeductionCents > 0).map((l) => l.employeeId!).filter(Boolean) } }, select: { id: true, fullName: true, employeeNumber: true } });
+  const sum = (pick: (line: (typeof lines)[number]) => number) => lines.reduce((total, line) => total + pick(line), 0);
+  await alertCompany(organizationId, {
+    productSlug: "payroll",
+    title: `Payroll finalised: ${period}`,
+    body: `PAYE ${formatRand(sum((line) => line.payeCents))}, net pay ${formatRand(sum((line) => line.netCents))}.`,
+    kind: "payroll_finalised",
+    subject: `Payroll for ${period} is finalised`,
+    lines: [
+      `${lines.length} payslips are locked.`,
+      `PAYE ${formatRand(sum((line) => line.payeCents))}.`,
+      `UIF from staff ${formatRand(sum((line) => line.uifEmployeeCents))} and from the company ${formatRand(sum((line) => line.uifEmployerCents))}.`,
+      `SDL ${formatRand(sum((line) => line.sdlCents))}.`,
+      `Net pay to transfer ${formatRand(sum((line) => line.netCents))}.`,
+      "Download the EMP201 figures and the bank file from Payroll. TaskCrate does not submit the return to SARS.",
+    ],
+  });
+  const staff = await db.payrollEmployee.findMany({ where: { id: { in: lines.filter((l) => l.otherDeductionCents > 0).map((l) => l.employeeId!).filter(Boolean) } }, select: { id: true, fullName: true, employeeNumber: true } });
   const matched = matchDeductions(await aodDeductionsFor(organizationId, period), staff).byEmployee;
   await recordPayrollDeductions(organizationId, period, "Payroll", [...matched.values()].flatMap((m) => m.recordIds));
   return finalised;

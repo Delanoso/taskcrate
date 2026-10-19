@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { alertCompany } from "@/lib/email";
 import { dutyBlockReasons } from "@/lib/modules/duty-gate";
 import { saveDataUrlUpload } from "@/lib/uploads";
 import {
@@ -150,13 +151,13 @@ export async function POST(
           status: "submitted",
         },
       });
-      await db.notification.create({
-        data: {
-          organizationId: item.organizationId,
-          productSlug: "permit-to-work",
-          title: "Permit submitted for approval",
-          body: `${body.contractorName} signed and submitted “${item.title}” for issuer sign-off.`,
-        },
+      await alertCompany(item.organizationId, {
+        productSlug: "permit-to-work",
+        title: "Permit submitted for approval",
+        body: `${body.contractorName} signed and submitted “${item.title}” for issuer sign-off.`,
+        kind: "permit_submitted",
+        subject: `Permit to approve: ${item.title}`,
+        lines: [`${body.contractorName} signed “${item.title}”.`, "Work does not start until the issuer signs."],
       });
       return NextResponse.json({ ok: true, status: updated.status });
     }
@@ -181,13 +182,13 @@ export async function POST(
           status: "completed",
         },
       });
-      await db.notification.create({
-        data: {
-          organizationId: item.organizationId,
-          productSlug: "permit-to-work",
-          title: "Permit ready to close",
-          body: `${item.contractorName ?? "Receiver"} signed the close-out for “${item.title}”.`,
-        },
+      await alertCompany(item.organizationId, {
+        productSlug: "permit-to-work",
+        title: "Permit ready to close",
+        body: `${item.contractorName ?? "Receiver"} signed the close-out for “${item.title}”.`,
+        kind: "permit_close",
+        subject: `Permit ready to close: ${item.title}`,
+        lines: [`${item.contractorName ?? "The receiver"} signed the close-out for “${item.title}”.`, "The issuer still has to sign the close-out."],
       });
       return NextResponse.json({ ok: true, status: updated.status });
     }

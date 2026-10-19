@@ -31,6 +31,9 @@ export async function GET(req: Request) {
         rands(line.basicCents),
         rands(line.allowanceCents),
         rands(line.onceOffCents),
+        line.attendanceHours ?? "",
+        line.overtimeHours ?? "",
+        rands(line.overtimeCents),
         rands(line.grossCents),
         rands(line.payeCents),
         rands(line.uifEmployeeCents),
@@ -65,6 +68,9 @@ export async function GET(req: Request) {
         "Basic",
         "Allowances",
         "Once-off",
+        "Clocked hours",
+        "Overtime hours",
+        "Overtime",
         "Gross",
         "PAYE",
         "UIF employee",
@@ -82,9 +88,40 @@ export async function GET(req: Request) {
         "Note",
       ],
       rows,
-      widths: Array(29).fill(16),
+      widths: Array(32).fill(16),
     });
     return xlsxResponse(bytes, "Payroll runs");
+  }
+
+  if (scope === "bank") {
+    const period = new URL(req.url).searchParams.get("period") ?? "";
+    if (!/^\d{4}-\d{2}$/.test(period)) return new Response("Choose a month.", { status: 400 });
+    const run = await db.payrollRun.findUnique({
+      where: { organizationId_period: { organizationId: org, period } },
+      include: { lines: { orderBy: { fullName: "asc" } } },
+    });
+    if (!run) return new Response("Calculate this month first.", { status: 404 });
+    const employees = await db.payrollEmployee.findMany({
+      where: { id: { in: run.lines.map((line) => line.employeeId).filter((id): id is string => Boolean(id)) } },
+      select: { id: true, accountType: true },
+    });
+    const types = new Map(employees.map((employee) => [employee.id, employee.accountType]));
+    const rows = run.lines.map((line) => [
+      line.fullName,
+      line.bankName ?? "",
+      line.accountNumber ?? "",
+      line.branchCode ?? "",
+      (line.employeeId && types.get(line.employeeId)) || "",
+      rands(line.netCents),
+      line.accountNumber ? "" : "No account number — do not pay this row",
+    ]);
+    const bytes = buildXlsx({
+      sheetName: "Bank file",
+      headers: ["Name", "Bank", "Account", "Branch", "Account type", "Net pay", "Check"],
+      rows,
+      widths: [28, 18, 20, 14, 16, 14, 40],
+    });
+    return xlsxResponse(bytes, `Bank file ${period}`);
   }
 
   const employees = await db.payrollEmployee.findMany({ where: { organizationId: org }, orderBy: { fullName: "asc" } });

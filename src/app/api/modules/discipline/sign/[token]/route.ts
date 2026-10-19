@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { alertCompany } from "@/lib/email";
 import { companyName, notFound, parseBody } from "@/lib/modules/common";
 import { RIGHTS } from "@/lib/modules/discipline-options";
 import { SLUG, saveSignature, serializeCase } from "@/lib/modules/discipline-server";
@@ -68,13 +69,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       data: { status: "finalised", employeeSignature: await sig(), employeeSignedAt: new Date(), employeeComment: b.comment || null },
     });
   }
-  await db.notification.create({
-    data: {
-      organizationId: c.organizationId,
-      productSlug: SLUG,
-      title: `${c.employeeName} signed the ${b.kind === "notice" ? "hearing notice" : serializeCase(c).documentTitle.toLowerCase()}`,
-      body: serializeCase(c).reference,
-    },
+  const title = `${c.employeeName} signed the ${b.kind === "notice" ? "hearing notice" : serializeCase(c).documentTitle.toLowerCase()}`;
+  await alertCompany(c.organizationId, {
+    productSlug: SLUG,
+    title,
+    body: serializeCase(c).reference,
+    kind: "discipline_signed",
+    subject: title,
+    lines: [`${serializeCase(c).reference} is signed.`, b.kind === "notice" ? "Hold the hearing and record the outcome." : "The warning is on the file."],
   });
   return NextResponse.json({ ok: true });
 }

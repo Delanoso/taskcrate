@@ -427,6 +427,7 @@ export async function sendBillingDocument(organizationId: string, id: string) {
   const kind = doc.kind === "QUOTE" ? "quotation" : "invoice";
   const money = formatMoney(doc.totalCents, doc.currency);
   let emailed = false;
+  let emailError: string | null = null;
   if (doc.clientEmail) {
     const result = await sendEmail({
       to: doc.clientEmail,
@@ -439,8 +440,12 @@ export async function sendBillingDocument(organizationId: string, id: string) {
       ],
       button: { label: `Open the ${kind}`, url },
     });
-    if (!result.ok) throw new BillingError(result.error);
-    emailed = true;
+    emailed = result.ok;
+    if (!result.ok) emailError = result.error;
+  }
+  const hasPhone = isWaPhone(doc.clientPhone);
+  if (!emailed && !hasPhone) {
+    throw new BillingError(emailError ? `${emailError} The link is ${url}` : `Add an email or a cellphone. The link is ${url}`);
   }
   await db.billingDocument.update({
     where: { id },
@@ -453,7 +458,8 @@ export async function sendBillingDocument(organizationId: string, id: string) {
     url,
     waUrl: waLink(doc.clientPhone, `${from} sent you ${kind} ${doc.number} for ${money}: ${url}`),
     emailed,
+    emailError,
     hasEmail: Boolean(doc.clientEmail),
-    hasPhone: isWaPhone(doc.clientPhone),
+    hasPhone,
   };
 }

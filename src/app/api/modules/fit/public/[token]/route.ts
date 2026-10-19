@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { alertCompany } from "@/lib/email";
 import { FIT_BUBBLES, FIT_LIFE_MS, FIT_PPE, scoreFit } from "@/lib/modules/fit-gate";
 import { saveDataUrlUpload } from "@/lib/uploads";
 
@@ -74,13 +75,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   });
   if (scored.status === "FAILED") {
     const failedPpe = answers.filter((item) => !item.pass).map((item) => item.label);
-    await db.notification.create({
-      data: {
-        organizationId: site.organizationId,
-        productSlug: "fit-for-duty",
-        title: "Fit-for-duty not cleared",
-        body: `${body.employeeName} at ${site.name}: popped ${scored.hits}/${FIT_BUBBLES}, average ${scored.reactionMs} ms${failedPpe.length ? `, PPE failed: ${failedPpe.join(", ")}` : ""}.`,
-      },
+    const detail = `${body.employeeName} at ${site.name}: popped ${scored.hits}/${FIT_BUBBLES}, average ${scored.reactionMs} ms${failedPpe.length ? `, PPE failed: ${failedPpe.join(", ")}` : ""}.`;
+    await alertCompany(site.organizationId, {
+      productSlug: "fit-for-duty",
+      title: "Fit-for-duty not cleared",
+      body: detail,
+      kind: "fit_failed",
+      subject: `Not cleared: ${body.employeeName}`,
+      lines: [detail, "They cannot clock in or start a permit until they pass, unless a manager writes a reason on the spot."],
     });
   }
   return NextResponse.json({

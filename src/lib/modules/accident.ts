@@ -1,6 +1,7 @@
 import { randomBytes } from "crypto";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { alertCompany } from "@/lib/email";
 import { photoSchema } from "@/lib/modules/common";
 import { nextDocumentNumber } from "@/lib/modules/pdf-kit";
 import { saveDataUrlUpload } from "@/lib/uploads";
@@ -65,7 +66,7 @@ export async function fileAccident(organizationId: string, raw: unknown) {
     data.witnessSignature ? saveDataUrlUpload(data.witnessSignature, folder) : Promise.resolve(null),
   ]);
   const reportNumber = await nextDocumentNumber(organizationId, "ACC");
-  return db.accidentReport.create({
+  const report = await db.accidentReport.create({
     data: {
       organizationId,
       reportNumber,
@@ -91,6 +92,19 @@ export async function fileAccident(organizationId: string, raw: unknown) {
       status: "filed",
     },
   });
+  await alertCompany(organizationId, {
+    productSlug: "accident-report",
+    title: `Accident filed: ${report.reportNumber}`,
+    body: `${report.injuredName} at ${report.location}. ${report.injury}`,
+    kind: "accident_filed",
+    subject: `Accident filed: ${report.injuredName}`,
+    lines: [
+      `${report.reportNumber}: ${report.injuredName} at ${report.location}.`,
+      report.description,
+      "Investigate it, then download the COIDA pack when you report it to the Compensation Fund. An open investigation comes back in the morning email.",
+    ],
+  });
+  return report;
 }
 
 const text = (max: number, message: string) => z.string().trim().min(2, message).max(max);

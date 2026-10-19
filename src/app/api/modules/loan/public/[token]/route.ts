@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { alertCompany } from "@/lib/email";
 import { clientIp, companyName, notFound, parseBody } from "@/lib/modules/common";
 import { FOLDER, SLUG, serializeAod, termsFor } from "@/lib/modules/aod-server";
 import { saveDataUrlUpload } from "@/lib/uploads";
@@ -64,8 +65,14 @@ export async function POST(req: Request, { params }: Ctx) {
       signIp: clientIp(req),
     },
   });
-  await db.notification.create({
-    data: { organizationId: r.organizationId, productSlug: SLUG, title: `${body.data.signerName} signed ${r.reference ?? "an AOD"}`, body: `R ${r.amount.toFixed(2)} acknowledged. Repayments can now be recorded.` },
+  const title = `${body.data.signerName} signed ${r.reference ?? "an AOD"}`;
+  await alertCompany(r.organizationId, {
+    productSlug: SLUG,
+    title,
+    body: `R ${r.amount.toFixed(2)} acknowledged. Repayments can now be recorded.`,
+    kind: "aod_signed",
+    subject: title,
+    lines: [`R ${r.amount.toFixed(2)} is acknowledged.`, "Payroll can deduct it on the next run, or record a cash payment in the AOD Book."],
   });
   return NextResponse.json({ ok: true });
 }

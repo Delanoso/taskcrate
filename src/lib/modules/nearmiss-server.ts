@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import { z } from "zod";
 import type { NearMissReport } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { alertCompany } from "@/lib/email";
 import { appUrl, jsonList, photoSchema, saDateKey } from "@/lib/modules/common";
 import { CATEGORIES, MAX_REPORT_PHOTOS, REPORT_TYPE_KEYS, SEVERITY_KEYS, typeLabel } from "@/lib/modules/nearmiss-options";
 import { nextDocumentNumber } from "@/lib/modules/pdf-kit";
@@ -53,13 +54,14 @@ export async function createReport(organizationId: string, input: z.infer<typeof
       photosJson: JSON.stringify(photos),
     },
   });
-  await db.notification.create({
-    data: {
-      organizationId,
-      productSlug: SLUG,
-      title: `${typeLabel(input.reportType)} reported (${reference})`,
-      body: input.description.slice(0, 140),
-    },
+  const title = `${typeLabel(input.reportType)} reported (${reference})`;
+  await alertCompany(organizationId, {
+    productSlug: SLUG,
+    title,
+    body: input.description.slice(0, 140),
+    kind: "nearmiss_filed",
+    subject: title,
+    lines: [input.description.slice(0, 500), input.locationHint ? `Place: ${input.locationHint}` : "No place was given.", "Rate it and close it in Near-Miss. An overdue action comes back in the morning email."],
   });
   return report;
 }

@@ -473,10 +473,10 @@ export function BillingAdmin() {
                   <Button size="sm" variant="outline" onClick={async () => {
                     setError(null);
                     try {
-                      const sent = await jsonFetch<{ url: string; waUrl: string; emailed: boolean; hasPhone: boolean }>("/api/modules/billing", { method: "POST", body: JSON.stringify({ action: "send", id: row.id }) });
+                      const sent = await jsonFetch<{ url: string; waUrl: string; emailed: boolean; emailError: string | null; hasPhone: boolean }>("/api/modules/billing", { method: "POST", body: JSON.stringify({ action: "send", id: row.id }) });
                       await load();
                       if (sent.hasPhone) window.open(sent.waUrl, "_blank", "noopener");
-                      setNotice(sent.emailed ? `Emailed to ${row.clientEmail}.` : sent.hasPhone ? "WhatsApp is open with the link." : `Copy this link for the client: ${sent.url}`);
+                      setNotice(sent.emailed ? `Emailed to ${row.clientEmail}.` : sent.emailError && sent.hasPhone ? `Email failed (${sent.emailError}). WhatsApp is open with the link.` : sent.hasPhone ? "WhatsApp is open with the link." : `Copy this link for the client: ${sent.url}`);
                     } catch (err) {
                       setError(err instanceof Error ? err.message : "Could not send");
                     }

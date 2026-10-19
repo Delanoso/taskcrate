@@ -7,6 +7,7 @@ import { appOrigin, emailCompanyAdmins } from "@/lib/email";
 import { jsonList } from "@/lib/modules/common";
 import { sendAlertEmail } from "@/lib/mail";
 import { sendExpiryDigests } from "@/lib/expiry-digest";
+import { sendObWakes, sendOpsWatch } from "@/lib/ops-watch";
 import { sendDueTrialReminders } from "@/lib/trial-reminder";
 import { johannesburgParts } from "@/lib/trial-window";
 
@@ -79,6 +80,16 @@ const JOBS: Job[] = [
     name: "Morning dates",
     every: "daily",
     run: () => sendExpiryDigests(),
+  },
+  {
+    name: "Morning watch",
+    every: "daily",
+    run: () => sendOpsWatch(),
+  },
+  {
+    name: "OB wake",
+    every: "hourly",
+    run: () => sendObWakes(),
   },
   {
     name: "Win-back emails",

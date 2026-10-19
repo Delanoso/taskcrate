@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { EquipmentCustodyLog, EquipmentIssue, EquipmentItem } from "@/generated/prisma/client";
 import { companyHasApp } from "@/lib/billing";
 import { db } from "@/lib/db";
+import { alertCompany } from "@/lib/email";
 import { requireProductApi } from "@/lib/modules/api-guard";
 import { appUrl, jsonList, saDateKey } from "@/lib/modules/common";
 import { CATEGORIES, CONDITIONS, OUTCOMES, type Checklist } from "@/lib/modules/equipment-options";
@@ -192,13 +193,14 @@ export async function raiseDeductible(issue: EquipmentIssue, item: EquipmentItem
       status: "pending",
     },
   });
-  await db.notification.create({
-    data: {
-      organizationId: issue.organizationId,
-      productSlug: LEDGER,
-      title: `Deductible raised for ${issue.employeeName}`,
-      body: `R ${amount.toFixed(2)} for ${item.name}. Set the repayment plan in the AOD Book and send it to the employee to sign before anything is deducted.`,
-    },
+  const body = `R ${amount.toFixed(2)} for ${item.name}. Set the repayment plan in the AOD Book and send it to the employee to sign before anything is deducted.`;
+  await alertCompany(issue.organizationId, {
+    productSlug: LEDGER,
+    title: `Deductible raised for ${issue.employeeName}`,
+    body,
+    kind: "aod_raised",
+    subject: `Deductible for ${issue.employeeName}`,
+    lines: [body],
   });
   return rec.id;
 }

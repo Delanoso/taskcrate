@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { alertCompany } from "@/lib/email";
 import {
   computeBalances,
   countLeaveDays,
@@ -125,14 +126,14 @@ export async function createLeaveRequest(input: NewRequest) {
   });
 
   if (status === "pending") {
-    await db.notification.create({
-      data: {
-        organizationId: input.organizationId,
-        productSlug: "leave-planner",
-        title: "Leave approval required",
-        body: `${emp.fullName}: ${leaveTypeLabel(input.leaveType)}, ${fmtLeaveRange(start, end)} (${fmtDays(days)})`,
-        dueAt: start,
-      },
+    const body = `${emp.fullName}: ${leaveTypeLabel(input.leaveType)}, ${fmtLeaveRange(start, end)} (${fmtDays(days)})`;
+    await alertCompany(input.organizationId, {
+      productSlug: "leave-planner",
+      title: "Leave approval required",
+      body,
+      kind: "leave_pending",
+      subject: `Leave to approve: ${emp.fullName}`,
+      lines: [body, "It stays pending until someone approves or declines it."],
     });
   }
   return { request, employee: emp };

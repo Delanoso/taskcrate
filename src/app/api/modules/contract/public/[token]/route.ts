@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { alertCompany } from "@/lib/email";
 import { companyName, notFound, parseBody, saDateKey } from "@/lib/modules/common";
 import { saveDataUrlUpload } from "@/lib/uploads";
 import { parseBlocks } from "@/lib/modules/contract-library";
@@ -67,13 +68,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     },
   });
   await storeSignedPdf(updated);
-  await db.notification.create({
-    data: {
-      organizationId: d.organizationId,
-      productSlug: SLUG,
-      title: `${body.data.signerName} signed ${d.title}`,
-      body: d.requireCountersign ? `${d.reference ?? ""} needs your countersignature.`.trim() : `${d.reference ?? ""} is complete. The signed PDF is ready.`.trim(),
-    },
+  const title = `${body.data.signerName} signed ${d.title}`;
+  const detail = d.requireCountersign ? `${d.reference ?? ""} needs your countersignature.`.trim() : `${d.reference ?? ""} is complete. The signed PDF is ready.`.trim();
+  await alertCompany(d.organizationId, {
+    productSlug: SLUG,
+    title,
+    body: detail,
+    kind: "contract_signed",
+    subject: title,
+    lines: [detail || title],
   });
   return NextResponse.json({ ok: true });
 }

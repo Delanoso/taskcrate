@@ -383,6 +383,12 @@ export function PayrollAdmin() {
               {current?.status === "FINALISED" && (
                 <Button variant="outline" onClick={() => run({ action: "reopen", period }, "Month reopened.").catch((err) => setError(err instanceof Error ? err.message : "Could not reopen"))}>Reopen this month</Button>
               )}
+              {current && (
+                <>
+                  <Button size="sm" variant="outline" asChild><a href={`/api/modules/payroll/pack?period=${period}`}>EMP201 figures</a></Button>
+                  <Button size="sm" variant="outline" asChild><a href={`/api/modules/payroll/export?scope=bank&period=${period}`}>Bank file</a></Button>
+                </>
+              )}
             </div>
             {current && (
               <div className="space-y-2">

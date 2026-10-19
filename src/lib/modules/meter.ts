@@ -1,5 +1,6 @@
 import type { MeterReading, MeterSite } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { alertCompany } from "@/lib/email";
 import { saveDataUrlUpload } from "@/lib/uploads";
 import { buildWhatsAppShareLink } from "@/lib/whatsapp";
 import { unitForType, type ReadingView, type SiteDetail, type SiteSummary } from "@/lib/modules/meter-shared";
@@ -182,13 +183,13 @@ export async function logReading(input: {
     const msg = `ALERT: ${input.site.name} (${input.site.meterType}) usage spike. Reading ${reading} ${unit}. ${varianceNote}`;
     const phone = (input.site.alertPhone ?? "").replace(/\D/g, "");
     whatsAppUrl = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}` : share.whatsAppUrl;
-    await db.notification.create({
-      data: {
-        organizationId: input.site.organizationId,
-        productSlug: "meter-variance",
-        title: "Meter variance",
-        body: msg,
-      },
+    await alertCompany(input.site.organizationId, {
+      productSlug: "meter-variance",
+      title: "Meter variance",
+      body: msg,
+      kind: "meter_variance",
+      subject: `Meter spike: ${input.site.name}`,
+      lines: [msg, "Check the meter and record what you found. The reading stays flagged until someone signs the check."],
     });
   }
 

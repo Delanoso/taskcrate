@@ -1,5 +1,6 @@
 import type { StockItem, StockMovement } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { alertCompany } from "@/lib/email";
 import {
   STOCK_UNITS,
   type StockItemView,
@@ -109,7 +110,8 @@ export async function recordMovement(input: MovementInput) {
     );
   }
 
-  return db.$transaction(async (tx) => {
+  const breached: { body: string }[] = [];
+  const result = await db.$transaction(async (tx) => {
     const item = await tx.stockItem.findFirst({
       where: { id: input.itemId, organizationId: input.organizationId },
     });
@@ -162,18 +164,22 @@ export async function recordMovement(input: MovementInput) {
     });
 
     if (item.quantity > item.reorderAt && balance <= item.reorderAt) {
-      await tx.notification.create({
-        data: {
-          organizationId: item.organizationId,
-          productSlug: "workshop-consumables",
-          title: "Reorder threshold breached",
-          body: `${item.name} now at ${balance} ${unitOf(item.unit)} (reorder at ${item.reorderAt})`,
-        },
-      });
+      breached.push({ body: `${item.name} now at ${balance} ${unitOf(item.unit)} (reorder at ${item.reorderAt})` });
     }
 
     return { item: updated, movement };
   });
+  for (const row of breached) {
+    await alertCompany(input.organizationId, {
+      productSlug: "workshop-consumables",
+      title: "Reorder threshold breached",
+      body: row.body,
+      kind: "stock_reorder",
+      subject: "Stock to reorder",
+      lines: [row.body, "It stays on the morning list until the quantity is above the reorder level."],
+    });
+  }
+  return result;
 }
 
 export type JobPartIssue = { name: string; qty: number };
@@ -228,6 +234,7 @@ export async function issuePartsForJob(input: {
   const takenSignature = signature(input.takenSignature, "The technician must sign before parts come off stock.");
   const loggedSignature = signature(input.loggedSignature, "The person accepting the job must sign before parts come off stock.");
 
+  const breached: string[] = [];
   await db.$transaction(async (tx) => {
     for (const part of matched) {
       const balance = part.onHand - part.qty;
@@ -248,17 +255,20 @@ export async function issuePartsForJob(input: {
         },
       });
       if (part.onHand > part.reorderAt && balance <= part.reorderAt) {
-        await tx.notification.create({
-          data: {
-            organizationId: input.organizationId,
-            productSlug: "workshop-consumables",
-            title: "Reorder threshold breached",
-            body: `${part.name} now at ${balance} (reorder at ${part.reorderAt}), issued to ${input.jobNumber}`,
-          },
-        });
+        breached.push(`${part.name} now at ${balance} (reorder at ${part.reorderAt}), issued to ${input.jobNumber}`);
       }
     }
   });
+  for (const body of breached) {
+    await alertCompany(input.organizationId, {
+      productSlug: "workshop-consumables",
+      title: "Reorder threshold breached",
+      body,
+      kind: "stock_reorder",
+      subject: "Stock to reorder",
+      lines: [body, "It stays on the morning list until the quantity is above the reorder level."],
+    });
+  }
 
   const issued = matched.map((part) => `${part.name} × ${part.qty}`).join(", ");
   const extra = unmatched.length ? ` Not on the stock list: ${unmatched.join(", ")}.` : "";

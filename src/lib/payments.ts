@@ -3,6 +3,7 @@ import type { PaymentIntent } from "@/generated/prisma/client";
 import { RENT_ZAR, getProduct } from "@/data/products";
 import { grantPaidPeriod } from "@/lib/billing";
 import { db } from "@/lib/db";
+import { alertCompany } from "@/lib/email";
 import { jsonList } from "@/lib/modules/common";
 import { sendAlertEmail } from "@/lib/mail";
 import { requestPasswordReset } from "@/lib/password-reset";
@@ -176,13 +177,14 @@ export async function handlePayfastItn(form: FormData): Promise<ItnResult> {
       periodLabel: periodLabel(now),
     },
   });
-  await db.notification.create({
-    data: {
-      organizationId,
-      productSlug: "billing",
-      title: `Payment received: R ${gross.toFixed(2)}`,
-      body: `${apps.length} app${apps.length === 1 ? "" : "s"} paid for ${periodLabel(now)}. The invoice is on the Billing page.`,
-    },
+  const paidBody = `${apps.length} app${apps.length === 1 ? "" : "s"} paid for ${periodLabel(now)}. The invoice is on the Billing page.`;
+  await alertCompany(organizationId, {
+    productSlug: "billing",
+    title: `Payment received: R ${gross.toFixed(2)}`,
+    body: paidBody,
+    kind: "payment_received",
+    subject: `Payment received: R ${gross.toFixed(2)}`,
+    lines: [paidBody],
   });
   if (!intent.sandbox) {
     await sendAlertEmail({

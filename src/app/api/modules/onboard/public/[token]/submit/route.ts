@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { alertCompany } from "@/lib/email";
 import { notFound, parseBody, removeUpload } from "@/lib/modules/common";
 import { saveDataUrlUpload } from "@/lib/uploads";
 import { EDITABLE, FOLDER, SLUG, loadPublicPacket, progress } from "@/lib/modules/onboard-server";
@@ -29,13 +30,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     where: { id: p.id },
     data: { status: "submitted", consentName: body.data.consentName, consentSignature: signature, consentAt: new Date(), submittedAt: new Date(), reviewNote: null },
   });
-  await db.notification.create({
-    data: {
-      organizationId: p.organizationId,
-      productSlug: SLUG,
-      title: `${p.employeeName} ${resubmit ? "re-submitted" : "submitted"} their onboarding pack`,
-      body: "Review the details and documents, then approve or request changes.",
-    },
+  const title = `${p.employeeName} ${resubmit ? "re-submitted" : "submitted"} their onboarding pack`;
+  await alertCompany(p.organizationId, {
+    productSlug: SLUG,
+    title,
+    body: "Review the details and documents, then approve or request changes.",
+    kind: "onboard_submitted",
+    subject: title,
+    lines: [`${p.employeeName} sent their pack.`, "Review it and approve it, or send it back. It stays on the morning list until you do."],
   });
   return NextResponse.json({ ok: true });
 }

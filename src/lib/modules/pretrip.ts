@@ -1,5 +1,6 @@
 import type { Vehicle, VehicleTripLog } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { alertCompany } from "@/lib/email";
 import { saveDataUrlUpload } from "@/lib/uploads";
 import { PANEL_SIDES, PRETRIP_CHECKS, paperState, parseChecks, parsePhotos, tripIsOpen, type TripPhoto, type TripView } from "@/lib/modules/pretrip-shared";
 
@@ -233,13 +234,13 @@ export async function startPretrip(input: {
       faultNote ? `Note: ${faultNote}` : "",
       varianceText,
     ].filter(Boolean);
-    await db.notification.create({
-      data: {
-        organizationId: input.vehicle.organizationId,
-        productSlug: "pretrip-handover",
-        title: "Fleet variance / fault flag",
-        body: `${input.vehicle.regNumber}: ${driverName}, km ${startKm}`,
-      },
+    await alertCompany(input.vehicle.organizationId, {
+      productSlug: "pretrip-handover",
+      title: "Fleet variance / fault flag",
+      body: `${input.vehicle.regNumber}: ${driverName}, km ${startKm}`,
+      kind: "pretrip_fault",
+      subject: `Vehicle fault: ${input.vehicle.regNumber}`,
+      lines,
     });
     await db.jobCard.create({
       data: {

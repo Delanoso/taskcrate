@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { alertCompany } from "@/lib/email";
 import { clientIp, companyName, notFound, parseBody, saDateKey } from "@/lib/modules/common";
 import { CUSTODY_TERMS } from "@/lib/modules/equipment-options";
 import { FOLDER, ISSUER, logEvent, signatureSchema } from "@/lib/modules/equipment-server";
@@ -59,13 +60,14 @@ export async function POST(req: Request, { params }: Ctx) {
     data: { status: "active", signMethod: "link", signerName: body.data.signerName, signatureUrl: url, signedAt: new Date(), signIp: clientIp(req) },
   });
   for (const p of pending) await logEvent({ organizationId: orgId, itemId: p.itemId, issueId: p.id, employeeName: p.employeeName, action: "signed", by: body.data.signerName, note: "Signed via link" });
-  await db.notification.create({
-    data: {
-      organizationId: orgId,
-      productSlug: ISSUER,
-      title: `${body.data.signerName} signed for equipment`,
-      body: `${found.issue.documentNumber}: ${pending.map((p) => p.item.name).join(", ")}`.slice(0, 500),
-    },
+  const detail = `${found.issue.documentNumber}: ${pending.map((p) => p.item.name).join(", ")}`.slice(0, 500);
+  await alertCompany(orgId, {
+    productSlug: ISSUER,
+    title: `${body.data.signerName} signed for equipment`,
+    body: detail,
+    kind: "equipment_signed",
+    subject: `${body.data.signerName} signed for equipment`,
+    lines: [detail, "The items stay out until they are handed back."],
   });
   return NextResponse.json({ ok: true });
 }

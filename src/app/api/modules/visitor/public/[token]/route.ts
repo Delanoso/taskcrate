@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { alertCompany } from "@/lib/email";
 import { saveDataUrlUpload } from "@/lib/uploads";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ token: string }> }) {
@@ -58,6 +59,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       signatureUrl,
       whatsappSent: true,
     },
+  });
+
+  await alertCompany(site.organizationId, {
+    productSlug: "site-visitor",
+    title: `${body.fullName} signed in at ${site.name}`,
+    body: `Visiting ${body.hostName}. ${body.purpose}`,
+    kind: "visitor_in",
+    subject: `Visitor: ${body.fullName} at ${site.name}`,
+    lines: [`${body.fullName}${body.company ? ` from ${body.company}` : ""} is here to see ${body.hostName}.`, `Purpose: ${body.purpose}.`, "If they are still signed in tomorrow morning, this comes back on the list."],
   });
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3847";

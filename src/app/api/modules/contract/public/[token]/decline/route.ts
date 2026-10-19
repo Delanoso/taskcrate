@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { alertCompany } from "@/lib/email";
 import { notFound, parseBody } from "@/lib/modules/common";
 import { OPEN, SLUG, clientIp, normStatus } from "@/lib/modules/contract-server";
 
@@ -17,8 +18,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     where: { id: d.id },
     data: { status: "declined", declinedAt: new Date(), declineReason: body.data.reason, viewIp: d.viewIp ?? clientIp(req), viewedAt: d.viewedAt ?? new Date() },
   });
-  await db.notification.create({
-    data: { organizationId: d.organizationId, productSlug: SLUG, title: `${d.employeeName ?? "An employee"} declined ${d.title}`, body: body.data.reason },
+  const title = `${d.employeeName ?? "An employee"} declined ${d.title}`;
+  await alertCompany(d.organizationId, {
+    productSlug: SLUG,
+    title,
+    body: body.data.reason,
+    kind: "contract_declined",
+    subject: title,
+    lines: [body.data.reason, "Open the contract and decide whether to change it or withdraw it."],
   });
   return NextResponse.json({ ok: true });
 }

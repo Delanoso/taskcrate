@@ -74,6 +74,19 @@ export async function companyAdmins(organizationId: string) {
   return rows.map((r) => r.user);
 }
 
+/** In-app alert plus an email to every owner and admin. The email is how the company hears about it without logging in. */
+export async function alertCompany(organizationId: string, input: { productSlug: string; title: string; body: string; kind: string; subject: string; lines: string[] }) {
+  await db.notification.create({
+    data: { organizationId, productSlug: input.productSlug, title: input.title, body: input.body.slice(0, 500) },
+  }).catch(() => undefined);
+  return emailCompanyAdmins(organizationId, {
+    kind: input.kind,
+    subject: input.subject,
+    lines: input.lines,
+    button: { label: "Open TaskCrate", url: `${appOrigin()}/dashboard` },
+  });
+}
+
 /** Same email to every owner/admin, each greeted by first name. Returns how many were sent. */
 export async function emailCompanyAdmins(organizationId: string, input: { subject: string; kind: string } & Omit<EmailContent, "greeting">) {
   let sent = 0;

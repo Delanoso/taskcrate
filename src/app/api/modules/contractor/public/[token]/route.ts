@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { alertCompany } from "@/lib/email";
 import { parseRequirements, resolveItem } from "@/lib/modules/safety-file-items";
 import { documentSelect, safetyFileView } from "@/lib/modules/safety-file-server";
 import { saveSafetyFileDocument } from "@/lib/safety-file-storage";
@@ -65,17 +66,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     select: documentSelect,
   });
 
-  if (expiresAt) {
-    await db.notification.create({
-      data: {
-        organizationId: profile.organizationId,
-        productSlug: "contractor-safety-file",
-        title: `${profile.companyName}: ${item.label} expires`,
-        body: `${profile.companyName} uploaded ${item.label} expiring ${expiresRaw}.`,
-        dueAt: expiresAt,
-      },
-    });
-  }
+  const title = `${profile.companyName} uploaded ${item.label}`;
+  await alertCompany(profile.organizationId, {
+    productSlug: "contractor-safety-file",
+    title,
+    body: expiresRaw ? `${item.label} expires ${expiresRaw}.` : `${item.label} is on the file.`,
+    kind: "contractor_upload",
+    subject: title,
+    lines: [expiresRaw ? `${item.label} expires ${expiresRaw}. Check the file is now active.` : `${item.label} is on the file. Check whether the contractor can work.`],
+  });
 
   const fresh = await db.contractorProfile.findUniqueOrThrow({
     where: { id: profile.id },

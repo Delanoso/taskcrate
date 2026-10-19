@@ -122,7 +122,11 @@ export function TrainingAdmin() {
           </CardHeader>
           <CardContent className="space-y-2">
             {due.map((ticket) => (
-              <p key={ticket.id} className="text-sm">{ticket.fullName} · {ticket.ticketType} · {ticket.expiresOn} · <StatusBadge status={ticket.state} /></p>
+              <p key={ticket.id} className="text-sm">
+                {ticket.fullName} · {ticket.ticketType} · {ticket.expiresOn} · <StatusBadge status={ticket.state} />
+                {" · "}
+                <button type="button" className="underline" onClick={() => setForm({ ...empty, id: ticket.id, fullName: ticket.fullName, employeeNumber: ticket.employeeNumber ?? "", ticketType: (TICKET_TYPES as readonly string[]).includes(ticket.ticketType) ? ticket.ticketType : "Other", otherType: (TICKET_TYPES as readonly string[]).includes(ticket.ticketType) ? "" : ticket.ticketType, certificateNumber: ticket.certificateNumber ?? "", provider: ticket.provider ?? "", issuedOn: ticket.issuedOn, expiresOn: ticket.expiresOn, note: ticket.note ?? "" })}>Renew</button>
+              </p>
             ))}
           </CardContent>
         </Card>
