@@ -91,7 +91,13 @@ export default async function ProductDetailPage({
         </div>
 
         <div className="lg:sticky lg:top-24 lg:self-start">
-          {canAdd ? (
+          {canAdd && session ? (
+            <div className="space-y-3 rounded-xl border bg-card p-6">
+              <p className="font-medium">Add {product.name}</p>
+              <p className="text-sm text-muted-foreground">Choose it on your Billing page with any other apps. One PayFast debit order covers them all.</p>
+              <Button asChild className="w-full"><Link href={`/dashboard/billing?add=${product.slug}`}>Add on the Billing page</Link></Button>
+            </div>
+          ) : canAdd ? (
             <PurchasePanel productSlug={product.slug} />
           ) : (
             <p className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">

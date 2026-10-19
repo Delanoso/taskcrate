@@ -16,7 +16,9 @@ Each organization's data is logically separated. You are responsible for managin
 4. Trial and payments
 A new company may receive one 7-day trial of every App. No card is required for the trial. A second registration with the same email, cellphone number, or company name does not receive another trial.
 
-Each App rents for R1 000 per month. The first payment covers the days left in the current month, including the day of payment. After that, the rent is due on the 1st of each month. If a payment is missed, cancelled, or fails, that App closes until it is paid. Fees are non-refundable except where required by law.
+Each App rents for R1 000 per month. You pay by card through PayFast. The first payment covers the days left in the current month, including the day of payment, and sets up one monthly debit order for the Apps you chose. After that, the debit order runs on the 1st of each month. An invoice for every payment is on the Billing page.
+
+You can cancel a debit order or change the card at any time on the Billing page. Cancelling stops future debits; the Apps stay open until the end of the month already paid for. If a monthly debit fails, the Apps stay open for 3 more days, then close until paid. Fees are non-refundable except where required by law.
 
 5. Acceptable use
 You will not use the Apps for unlawful purposes, to store malicious content, or to attempt to access another tenant's data.
@@ -58,7 +60,7 @@ The company owns the records it enters, such as employee, visitor, permit, and s
 Account messages, including password-reset links and trial reminders, are sent from hello@taskcrate.co.za.
 
 5. Payments
-When billing is open, monthly rent is collected by PayFast. Card numbers are handled by PayFast and are not stored in TaskCrate. We store whether an App is paid and the date it is paid until.
+Monthly rent is collected by PayFast. Card numbers are handled by PayFast and are not stored in TaskCrate. We store which Apps are paid, the date they are paid until, the PayFast debit order reference, and a record of each payment for your invoices.
 
 6. Support
 Tickets submitted in TaskCrate are stored in the control room and handled by Delano Solutions.
@@ -67,7 +69,7 @@ Tickets submitted in TaskCrate are stored in the control room and handled by Del
 We keep account and company records while the account exists, and afterwards for support, trial records, and our own records. Email hello@taskcrate.co.za to ask us to close an account.
 
 8. Sharing
-We do not sell personal information. Email to customers is sent from hello@taskcrate.co.za. Payment, when billing is open, is processed by PayFast.
+We do not sell personal information. Email to customers is sent from hello@taskcrate.co.za. Payment is processed by PayFast.
 
 9. Access and correction
 Email hello@taskcrate.co.za to ask what account information we hold, or to correct it.

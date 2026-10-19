@@ -2,7 +2,18 @@ import Link from "next/link";
 import { ArrowRight, Layers, Shield, Sparkles } from "lucide-react";
 import { ProductCard } from "@/components/platform/product-card";
 import { Button } from "@/components/ui/button";
-import { productsByCategory, formatRentLabel } from "@/data/products";
+import { getProduct, productsByCategory, formatRentLabel } from "@/data/products";
+
+const NEW_APPS: [string, string | null][] = [
+  ["payroll", "PAYE, UIF and payslips from the SARS tables, with AOD repayments taken off automatically."],
+  ["loan-deductible-ledger", "Acknowledgements of debt for any reason, signed on the phone, repaid through payroll."],
+  ["quotations", null],
+  ["site-attendance", null],
+  ["accident-report", null],
+  ["training-tickets", null],
+  ["equipment-issuer", "Issue a whole kit under one custody signature, and check it back in with photos."],
+  ["contract-sentinel", "South African contract templates, signed once on the phone and stamped on every page."],
+];
 
 export default function HomePage() {
   const byCat = productsByCategory();
@@ -41,13 +52,13 @@ export default function HomePage() {
               },
               {
                 icon: Shield,
-                title: "Billed together on the 1st",
-                text: "The first charge is only the days left this month. From the 1st, every app is R1 000.",
+                title: "One debit order, on the 1st",
+                text: "Pay by card through PayFast. The first charge is only the days left this month; then one monthly debit order covers every app you chose. Invoices on your Billing page.",
               },
               {
                 icon: Sparkles,
-                title: "Autopilot provision",
-                text: "Payment clears → tenant workspace + subscription created without manual setup.",
+                title: "Your logo on every PDF",
+                text: "Upload your logo and colours once. Permits, contracts, payslips, AODs and quotes all go out under your name.",
               },
             ].map(({ icon: Icon, title, text }) => (
               <div key={title} className="rounded-xl border bg-card p-5 shadow-sm">
@@ -57,6 +68,23 @@ export default function HomePage() {
               </div>
             ))}
           </dl>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-6xl px-4 pt-16 sm:px-6">
+        <h2 className="text-2xl font-semibold tracking-tight">New on TaskCrate</h2>
+        <p className="mt-1 max-w-2xl text-muted-foreground">Recently added and rebuilt apps. Every link you send now has a QR code too.</p>
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {NEW_APPS.map(([slug, note]) => {
+            const p = getProduct(slug);
+            if (!p) return null;
+            return (
+              <Link key={slug} href={`/products/${slug}`} className="rounded-xl border bg-card p-4 shadow-sm transition-colors hover:border-primary">
+                <p className="font-medium">{p.name}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{note ?? p.tagline}</p>
+              </Link>
+            );
+          })}
         </div>
       </section>
 

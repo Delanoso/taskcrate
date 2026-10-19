@@ -5,7 +5,7 @@ import { PRODUCTS } from "@/data/products";
 import { requireDashboardContext } from "@/lib/dashboard-context";
 import { canAccessProduct, canAddApps } from "@/lib/rbac";
 
-export default async function BillingPage({ searchParams }: { searchParams: Promise<{ paid?: string; cancelled?: string; card?: string }> }) {
+export default async function BillingPage({ searchParams }: { searchParams: Promise<{ paid?: string; cancelled?: string; card?: string; add?: string }> }) {
   const ctx = await requireDashboardContext();
   if (!canAddApps(ctx.access.role)) redirect("/dashboard");
   const sp = await searchParams;
@@ -20,7 +20,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
     >
       <h1 className="text-2xl font-semibold tracking-tight">Billing</h1>
       <p className="mt-1 text-muted-foreground">Pay for your apps by card through PayFast. One monthly debit order covers every app you choose.</p>
-      <BillingManager notice={notice} />
+      <BillingManager notice={notice} preselect={sp.add && PRODUCTS.some((p) => p.slug === sp.add) ? sp.add : null} />
     </DashboardShell>
   );
 }
