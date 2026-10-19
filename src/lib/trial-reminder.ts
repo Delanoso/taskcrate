@@ -11,7 +11,7 @@ function appOrigin() {
 }
 
 function paymentUrl() {
-  return `${appOrigin()}/login?next=/products`;
+  return `${appOrigin()}/login?next=/dashboard/billing`;
 }
 
 function reminderMessage(input: {

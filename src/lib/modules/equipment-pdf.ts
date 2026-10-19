@@ -103,7 +103,7 @@ export async function buildHandbackPdf(issues: IssueWithItem[]) {
     if (x.damageNotes) doc.field("Damage / findings", x.damageNotes);
     if (x.repairCost) doc.field("Estimated cost", money(x.repairCost));
     doc.field("Outcome", label(OUTCOMES, x.outcome));
-    if (x.deductibleId) doc.field("Deductible", "Raised in the Loan & Deductible Ledger for the employee's written consent");
+    if (x.deductibleId) doc.field("Deductible", "Raised in the AOD Book for the employee's written consent");
     const photos = jsonList(x.photosJson);
     if (photos.length) {
       doc.y -= 4;

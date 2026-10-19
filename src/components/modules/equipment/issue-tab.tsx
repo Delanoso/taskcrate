@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CheckCircle2, Copy, Download, MessageCircle, Search, Smartphone, Tablet } from "lucide-react";
+import { CheckCircle2, Download, MessageCircle, Search, Smartphone, Tablet } from "lucide-react";
 import { Button, Input, Label, jsonFetch } from "@/components/modules/ui-bits";
+import { LinkActions } from "@/components/modules/link-actions";
 import { SignaturePad } from "@/components/platform/signature-pad";
 import { CATEGORIES, CONDITIONS, CUSTODY_TERMS, money } from "@/lib/modules/equipment-options";
 import { isWaPhone, waLink } from "@/lib/phone";
@@ -101,13 +102,11 @@ export function IssueTab({ data, reload, initialPerson }: { data: EquipData; rel
         </div>
         {result.method === "link" && (
           <div className="space-y-2">
-            <p className="break-all rounded-md bg-muted/50 p-2 font-mono text-xs">{first.signingUrl}</p>
-            <div className="flex flex-wrap gap-2">
+            <LinkActions url={first.signingUrl} title={`Equipment custody - ${result.name}`}>
               <Button size="sm" asChild className="bg-green-600 text-white hover:bg-green-700">
                 <a href={waLink(result.phone, text)} target="_blank" rel="noreferrer"><MessageCircle className="size-4" />WhatsApp{isWaPhone(result.phone) ? "" : "…"}</a>
               </Button>
-              <Button size="sm" variant="outline" onClick={() => navigator.clipboard.writeText(first.signingUrl)}><Copy className="size-4" />Copy link</Button>
-            </div>
+            </LinkActions>
           </div>
         )}
         <div className="flex flex-wrap gap-2 border-t pt-4">

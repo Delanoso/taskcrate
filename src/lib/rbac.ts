@@ -1,6 +1,6 @@
 import { OrgRole } from "@/generated/prisma/client";
 import { PRODUCTS } from "@/data/products";
-import { expireUnpaidSubscriptions, formatRentDate } from "@/lib/billing";
+import { expireUnpaidSubscriptions, formatRentDate, openRentWhere } from "@/lib/billing";
 import { db } from "@/lib/db";
 import { sendAlertEmail } from "@/lib/mail";
 import { remindCompanyIfDue } from "@/lib/trial-reminder";
@@ -71,11 +71,7 @@ export async function getAccessContext(
   }
 
   const subs = await db.subscription.findMany({
-    where: {
-      organizationId: session.organizationId,
-      status: "active",
-      currentPeriodEnd: { gt: new Date() },
-    },
+    where: openRentWhere(session.organizationId),
     select: { productSlug: true },
   });
   const lapsed = await db.subscription.findMany({

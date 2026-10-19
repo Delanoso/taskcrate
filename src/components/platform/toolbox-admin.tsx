@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TalkPage } from "@/components/toolbox/talk-page";
+import { LinkActions } from "@/components/modules/link-actions";
 import {
   TALK_CATEGORIES,
   TALK_LIBRARY,
@@ -342,9 +343,7 @@ export function ToolboxAdmin({ orgSlug }: { orgSlug: string }) {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="rounded-md bg-muted p-3 font-mono text-xs break-all">
-                {appUrl}/t/{selected.publicToken}
-              </p>
+              <LinkActions url={`${appUrl}/t/${selected.publicToken}`} title={selected.title} />
               <div className="flex flex-wrap gap-2">
                 <Button asChild variant="secondary" size="sm">
                   <a

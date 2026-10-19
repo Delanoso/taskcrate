@@ -3,8 +3,11 @@ import { db } from "@/lib/db";
 import { sendAlertEmail } from "@/lib/mail";
 import { monthQuote } from "@/lib/pricing";
 
+/** The debit on the 1st can clear days later; apps stay open meanwhile. */
+export const GRACE_MS = 3 * 24 * 60 * 60 * 1000;
+
 export function rentIsOpen(sub: { status: string; currentPeriodEnd: Date | null }) {
-  return sub.status === "active" && sub.currentPeriodEnd != null && sub.currentPeriodEnd.getTime() > Date.now();
+  return sub.status === "active" && sub.currentPeriodEnd != null && sub.currentPeriodEnd.getTime() + GRACE_MS > Date.now();
 }
 
 export function openRentWhere(organizationId: string, productSlug?: string) {
@@ -12,7 +15,7 @@ export function openRentWhere(organizationId: string, productSlug?: string) {
     organizationId,
     ...(productSlug ? { productSlug } : {}),
     status: "active",
-    currentPeriodEnd: { gt: new Date() },
+    currentPeriodEnd: { gt: new Date(Date.now() - GRACE_MS) },
   };
 }
 
@@ -154,7 +157,7 @@ export async function expireUnpaidSubscriptions(organizationId?: string) {
     where: {
       status: "active",
       ...(organizationId ? { organizationId } : {}),
-      OR: [{ currentPeriodEnd: null }, { currentPeriodEnd: { lte: now } }],
+      OR: [{ currentPeriodEnd: null }, { currentPeriodEnd: { lte: new Date(now.getTime() - GRACE_MS) } }],
     },
     include: { organization: true },
   });

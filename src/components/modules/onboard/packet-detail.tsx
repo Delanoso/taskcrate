@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, Circle, Copy, Download, Eye, FileArchive, FileText, MessageCircle, Pencil, RotateCcw, Trash2, X } from "lucide-react";
+import { CheckCircle2, Circle, Download, Eye, FileArchive, FileText, MessageCircle, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import { Button, Label, jsonFetch } from "@/components/modules/ui-bits";
+import { LinkActions } from "@/components/modules/link-actions";
 import { PacketForm, type PacketPayload } from "@/components/modules/onboard/packet-form";
 import { STATUS, fmtDate, fmtDateTime } from "@/components/modules/onboard/types";
 import type { Bank } from "@/lib/modules/onboard-items";
@@ -129,9 +130,7 @@ export function PacketDetail({
 
       {waitingOnHire && (
         <Section title="Send the link">
-          <p className="break-all rounded-md bg-muted/50 p-2 font-mono text-xs">{p.publicUrl}</p>
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" onClick={() => navigator.clipboard.writeText(p.publicUrl).then(() => setMsg("Link copied"))}><Copy className="size-4" />Copy link</Button>
+          <LinkActions url={p.publicUrl} title={`Onboarding pack - ${p.employeeName}`}>
             <Button size="sm" asChild className="bg-green-600 text-white hover:bg-green-700">
               <a href={waLink(p.employeePhone, waText)} target="_blank" rel="noreferrer"><MessageCircle className="size-4" />WhatsApp{isWaPhone(p.employeePhone) ? ` ${first}` : ""}</a>
             </Button>
@@ -140,7 +139,7 @@ export function PacketDetail({
                 <a href={`mailto:${p.employeeEmail}?subject=${encodeURIComponent(`Your onboarding pack - ${company}`)}&body=${encodeURIComponent(waText)}`}>Email</a>
               </Button>
             )}
-          </div>
+          </LinkActions>
         </Section>
       )}
 

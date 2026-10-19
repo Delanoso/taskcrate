@@ -14,12 +14,13 @@ export default function HomePage() {
         <div className="relative mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-28">
           <p className="text-sm font-medium text-primary">TaskCrate</p>
           <h1 className="mt-3 max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl">
-            The paper files a site company still gets asked for.
+            Every file your clients, auditors and inspectors ask for. Now online.
           </h1>
           <p className="mt-5 max-w-2xl text-lg text-muted-foreground">
-            Safety, people, vehicles, stock, quotes, and pay. Each app keeps the names, photos,
-            signatures, and dates, then downloads as a PDF or Excel. Rent one for {formatRentLabel()},
-            or try every app for 7 days with no card.
+            Permits, safety files, registers, contracts, payslips and quotes: the same documents
+            you are asked for on paper, captured on a phone, signed on screen, and ready as a branded
+            PDF or Excel the moment someone asks. Rent one app for {formatRentLabel()}, or try every
+            app for 7 days with no card.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button size="lg" asChild>

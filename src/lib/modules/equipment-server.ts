@@ -171,7 +171,7 @@ export const handbackInput = z.object({
   inspectorSignature: signatureSchema,
 });
 
-/** Creates a pending deductible in the Loan & Deductible Ledger for damage or loss. */
+/** Creates a pending deductible in the AOD Book for damage or loss. */
 export async function raiseDeductible(issue: EquipmentIssue, item: EquipmentItem, amount: number, reason: string, photoUrl: string | null) {
   const rec = await db.loanDeductibleRecord.create({
     data: {

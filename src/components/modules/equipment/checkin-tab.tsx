@@ -200,7 +200,7 @@ function Inspection({ data, reload, person, back, full }: { data: EquipData; rel
                         {full && data.modules.ledger && (
                           <label className="flex items-center gap-2 pb-2 text-sm">
                             <input type="checkbox" className="size-4" checked={l.raiseDeductible} onChange={(e) => set(x.id, { raiseDeductible: e.target.checked })} />
-                            Raise a deductible in the Ledger
+                            Raise a deductible in the AOD Book
                           </label>
                         )}
                       </div>

@@ -7,8 +7,8 @@ export function SiteFooter() {
         <div>
           <p className="font-semibold">TaskCrate</p>
           <p className="mt-1 max-w-md text-sm text-sidebar-foreground/70">
-            Premium micro-SaaS tools for growing teams — one dashboard, strict tenant isolation,
-            and branding on every document.
+            Premium micro-SaaS tools for growing businesses, the correct way — one dashboard, strict
+            tenant isolation, and branding on every document.
           </p>
           <p className="mt-3 text-xs text-sidebar-foreground/50">© Delano Solutions</p>
         </div>

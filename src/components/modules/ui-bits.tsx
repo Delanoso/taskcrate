@@ -5,13 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/modules/status-badge";
+import { LinkActions } from "@/components/modules/link-actions";
 
 export { Button, Input, Label, Card, CardContent, CardDescription, CardHeader, CardTitle, StatusBadge };
 
-export function LinkBox({ url }: { url: string }) {
-  return (
-    <p className="break-all rounded-md bg-muted p-3 font-mono text-xs">{url}</p>
-  );
+export function LinkBox({ url, title }: { url: string; title?: string }) {
+  return <LinkActions url={url} title={title} />;
 }
 
 export async function jsonFetch<T = any>(url: string, init?: RequestInit): Promise<T> {

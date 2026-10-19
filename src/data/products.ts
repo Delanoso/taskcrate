@@ -265,7 +265,7 @@ export const PRODUCTS: ProductDefinition[] = [
     tagline: "Returns inspected, photographed, and signed by both sides.",
     solves: "Gear comes back damaged and the argument starts later. There is no photo of the condition, and no signed decision to repair or write it off.",
     description:
-      "Check a worker's equipment back in with a proper inspection: condition against how it went out, a checklist, damage photos and repair cost. Decide per item whether it goes back into store, off for repair or is written off; both the worker and the inspector sign, and damage can be passed to the Loan & Deductible Ledger for the worker's written consent.",
+      "Check a worker's equipment back in with a proper inspection: condition against how it went out, a checklist, damage photos and repair cost. Decide per item whether it goes back into store, off for repair or is written off; both the worker and the inspector sign, and damage can be passed to the AOD Book for the worker's written consent.",
     category: "HR & Workforce",
     priceMonthlyZar: 1000,
     features: [
@@ -273,7 +273,7 @@ export const PRODUCTS: ProductDefinition[] = [
       "Damage photos and repair or replacement cost",
       "Back to store, repair queue or write-off",
       "Worker and inspector sign; handback PDF",
-      "Raise deductibles in the Loan & Deductible Ledger",
+      "Raise deductibles in the AOD Book",
     ],
     hasPdfExport: true,
     hasSignatures: true,
@@ -281,7 +281,7 @@ export const PRODUCTS: ProductDefinition[] = [
   },
   {
     slug: "loan-deductible-ledger",
-    name: "Loan & Incident Deductible Ledger",
+    name: "Loan & Incident Deductible AOD Book",
     tagline: "Advances and damage costs, agreed in writing before they hit the payslip.",
     solves: "An advance or a damage cost is deducted from pay with no signed acknowledgment. The employee disputes it, and there is no document.",
     description:

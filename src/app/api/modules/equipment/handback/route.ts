@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Damage photos and deductibles need the Equipment Handback module." }, { status: 403 });
   }
   const wantsDeductible = lines.some((l) => l.raiseDeductible);
-  if (wantsDeductible && !(await hasLedger(orgId))) return NextResponse.json({ error: "Your company does not subscribe to the Loan & Deductible Ledger." }, { status: 400 });
+  if (wantsDeductible && !(await hasLedger(orgId))) return NextResponse.json({ error: "Your company does not subscribe to the AOD Book." }, { status: 400 });
   if (lines.some((l) => l.raiseDeductible && !l.repairCost)) return NextResponse.json({ error: "Enter the cost for every deductible." }, { status: 400 });
 
   const receivedBy = await staffName(gate.session.userId);

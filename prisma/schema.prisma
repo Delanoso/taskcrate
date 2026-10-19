@@ -56,6 +56,9 @@ model Organization {
   departments    Department[]
   memberships    Membership[]
   subscriptions  Subscription[]
+  paymentIntents PaymentIntent[]
+  debitOrders    DebitOrder[]
+  billingPayments BillingPayment[]
   trialClaims    TrialClaim[]
   documents      DocumentSequence[]
   notifications  Notification[]
@@ -163,6 +166,64 @@ model Subscription {
   updatedAt            DateTime     @updatedAt
 
   @@unique([organizationId, productSlug])
+}
+
+/// One checkout attempt: the apps chosen and the exact amounts PayFast must report back.
+model PaymentIntent {
+  id              String        @id @default(cuid())
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reference       String        @unique
+  sandbox         Boolean       @default(false)
+  appsJson        String
+  amount          Float
+  recurringAmount Float
+  email           String
+  fullName        String
+  companyName     String
+  createdBy       String?
+  status          String        @default("pending") // pending|paid
+  payfastToken    String?
+  paidAt          DateTime?
+  createdAt       DateTime      @default(now())
+}
+
+/// A PayFast monthly debit order (subscription token) covering one or more apps.
+model DebitOrder {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  token           String       @unique
+  intentId        String
+  sandbox         Boolean      @default(false)
+  appsJson        String
+  recurringAmount Float
+  status          String       @default("active") // active|cancelled
+  lastPaidAt      DateTime?
+  cancelledAt     DateTime?
+  cancelledBy     String?
+  createdAt       DateTime     @default(now())
+}
+
+model BillingPayment {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  provider       String       @default("payfast")
+  providerRef    String       @unique
+  intentId       String?
+  token          String?
+  kind           String // first|recurring
+  sandbox        Boolean      @default(false)
+  appsJson       String
+  amountGross    Float
+  amountFee      Float?
+  amountNet      Float?
+  invoiceNumber  String       @unique
+  periodLabel    String
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
 }
 
 model TrialClaim {

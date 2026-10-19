@@ -76,7 +76,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
   } else {
     const denied = managersOnly(gate.access, "report equipment lost");
     if (denied) return denied;
-    if (b.raiseDeductible && !(await hasLedger(orgId))) return NextResponse.json({ error: "Your company does not subscribe to the Loan & Deductible Ledger." }, { status: 400 });
+    if (b.raiseDeductible && !(await hasLedger(orgId))) return NextResponse.json({ error: "Your company does not subscribe to the AOD Book." }, { status: 400 });
     if (b.raiseDeductible && !b.amount) return NextResponse.json({ error: "Enter the amount to recover." }, { status: 400 });
     const photoUrl = b.photo ? await saveDataUrlUpload(b.photo, `${FOLDER}/${orgId}`) : null;
     const updated = await db.equipmentIssue.update({

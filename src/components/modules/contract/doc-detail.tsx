@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Ban, Copy, Download, Mail, MessageCircle, RotateCcw, Trash2, X } from "lucide-react";
+import { Ban, Download, Mail, MessageCircle, RotateCcw, Trash2, X } from "lucide-react";
 import { Button, Input, Label, jsonFetch } from "@/components/modules/ui-bits";
+import { LinkActions } from "@/components/modules/link-actions";
 import { SignaturePad } from "@/components/platform/signature-pad";
 import { Pill, STATUS_TONE, fmtDate, textareaClass, type ContractData, type ContractDetail, type ContractDoc } from "@/components/modules/contract/types";
 import { STATUS_LABEL } from "@/lib/modules/contract-library";
@@ -116,8 +117,7 @@ export function DocDetail({
 
       {open && (
         <Section title={reminder ? "Remind" : "Send the link"}>
-          <p className="break-all rounded-md bg-muted/50 p-2 font-mono text-xs">{d.signingUrl}</p>
-          <div className="flex flex-wrap gap-2">
+          <LinkActions url={d.signingUrl} title={`${d.title} - ${d.employeeName}`}>
             <Button size="sm" asChild className="bg-green-600 text-white hover:bg-green-700">
               <a href={wa} target="_blank" rel="noreferrer" onClick={() => reminder && act("remind", { action: "remind" }, "Reminder logged")}>
                 <MessageCircle className="size-4" />{reminder ? "WhatsApp reminder" : "WhatsApp"}{isWaPhone(d.employeePhone) ? "" : "…"}
@@ -128,8 +128,7 @@ export function DocDetail({
                 <a href={`mailto:${d.employeeEmail}?subject=${encodeURIComponent(`${d.title} - please sign`)}&body=${encodeURIComponent(inviteText(d, data.company, reminder))}`}><Mail className="size-4" />Email</a>
               </Button>
             )}
-            <Button size="sm" variant="outline" onClick={() => navigator.clipboard.writeText(d.signingUrl).then(() => setMsg("Link copied"))}><Copy className="size-4" />Copy link</Button>
-          </div>
+          </LinkActions>
         </Section>
       )}
 

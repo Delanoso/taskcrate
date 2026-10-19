@@ -45,11 +45,9 @@ export function PurchasePanel({ productSlug }: { productSlug: string }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Checkout failed");
       if (data.payfastHtml) {
-        const w = window.open("", "_self");
-        if (w) {
-          w.document.write(data.payfastHtml);
-          w.document.close();
-        }
+        document.open();
+        document.write(data.payfastHtml);
+        document.close();
         return;
       }
       if (data.url) {
@@ -137,8 +135,8 @@ export function PurchasePanel({ productSlug }: { productSlug: string }) {
           {loading ? "Redirecting to payment…" : `Pay R${quote.amount.toFixed(2)} today`}
         </Button>
         <p className="text-xs text-muted-foreground">
-          PayFast or Stripe (ZAR). When payment clears, your multi-tenant workspace is created
-          automatically and you can sign in.
+          Card payment through PayFast, then a monthly debit order you can cancel any time. When the
+          payment clears, your workspace opens and we email you a link to set your password.
         </p>
         {error && <p className="text-sm text-destructive">{error}</p>}
       </CardContent>

@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Camera, FileText, MessageCircle, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import { Button, Input, Label, jsonFetch } from "@/components/modules/ui-bits";
+import { LinkActions } from "@/components/modules/link-actions";
 import { SignaturePad } from "@/components/platform/signature-pad";
 import { CaseForm, type CasePayload } from "@/components/modules/discipline/case-form";
 import {
@@ -268,14 +269,15 @@ function HearingStep({ c, busy, run, patch, waNotice, recommended }: StepProps &
             {c.noticeAckAt ? `Employee acknowledged the notice ${fmtDate(c.noticeAckAt, true)}` : "Employee has not acknowledged the notice yet"}
           </p>
           {c.status === "hearing" && !c.noticeAckAt && (
-            <div className="flex flex-wrap gap-2">
-              {waNotice && (
-                <Button asChild size="sm" className="bg-[#25D366] text-white hover:bg-[#1ebe5a]">
-                  <a href={waNotice} target="_blank" rel="noreferrer"><MessageCircle className="size-4" />Send notice on WhatsApp</a>
-                </Button>
-              )}
-              {c.signUrl && <Button size="sm" variant="outline" onClick={() => navigator.clipboard.writeText(c.signUrl!)}>Copy link</Button>}
-            </div>
+            c.signUrl ? (
+              <LinkActions url={c.signUrl} showUrl={false} title={`Hearing notice - ${c.employeeName}`}>
+                {waNotice && (
+                  <Button asChild size="sm" className="bg-[#25D366] text-white hover:bg-[#1ebe5a]">
+                    <a href={waNotice} target="_blank" rel="noreferrer"><MessageCircle className="size-4" />Send notice on WhatsApp</a>
+                  </Button>
+                )}
+              </LinkActions>
+            ) : null
           )}
           {c.status === "hearing" && !c.noticeAckAt && (
             <details className="rounded-md border p-2">
@@ -447,13 +449,21 @@ function SignStep({ c, busy, run, patch, wa }: StepProps & { wa: string | null }
     <section className="space-y-3 border-t pt-4">
       <h4 className="font-medium">Employee acknowledgement</h4>
       <p className="text-sm text-muted-foreground">The employee signs to confirm they received the {c.documentTitle.toLowerCase()}. If they refuse, a witness signs instead.</p>
+      {c.signUrl && (
+        <LinkActions url={c.signUrl} showUrl={false} title={`${c.documentTitle} - ${c.employeeName}`}>
+          {wa && (
+            <Button asChild size="sm" className="bg-[#25D366] text-white hover:bg-[#1ebe5a]">
+              <a href={wa} target="_blank" rel="noreferrer"><MessageCircle className="size-4" />Send to sign on WhatsApp</a>
+            </Button>
+          )}
+        </LinkActions>
+      )}
       <div className="flex flex-wrap gap-2">
-        {wa && (
+        {!c.signUrl && wa && (
           <Button asChild size="sm" className="bg-[#25D366] text-white hover:bg-[#1ebe5a]">
             <a href={wa} target="_blank" rel="noreferrer"><MessageCircle className="size-4" />Send to sign on WhatsApp</a>
           </Button>
         )}
-        {c.signUrl && <Button size="sm" variant="outline" onClick={() => navigator.clipboard.writeText(c.signUrl!)}>Copy signing link</Button>}
         <Button size="sm" variant={mode === "here" ? "default" : "outline"} onClick={() => setMode(mode === "here" ? null : "here")}>Sign here now</Button>
         <Button size="sm" variant={mode === "refused" ? "default" : "outline"} onClick={() => setMode(mode === "refused" ? null : "refused")}>Employee refuses to sign</Button>
       </div>

@@ -7,7 +7,7 @@ import { createSession } from "@/lib/session";
 export default async function CheckoutSuccessPage({
   searchParams,
 }: {
-  searchParams: Promise<{ session_id?: string; provider?: string; product?: string }>;
+  searchParams: Promise<{ session_id?: string; provider?: string; product?: string; paid?: string }>;
 }) {
   const sp = await searchParams;
   let message =
@@ -53,9 +53,9 @@ export default async function CheckoutSuccessPage({
     }
   }
 
-  if (sp.provider === "payfast") {
+  if (sp.provider === "payfast" || sp.paid) {
     message =
-      "PayFast confirmed redirect. Your workspace is provisioned when the ITN webhook arrives (usually seconds). Sign in with the email you paid with.";
+      "Payment received through PayFast. Your workspace opens as soon as PayFast confirms it (usually within a minute). If you are new to TaskCrate, we have emailed you a link to set your password; otherwise sign in with the email you paid with.";
   }
 
   return (

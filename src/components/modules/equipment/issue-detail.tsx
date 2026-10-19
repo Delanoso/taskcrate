@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, ArrowDownToLine, Ban, Copy, Download, MessageCircle, PenLine, X } from "lucide-react";
+import { AlertTriangle, ArrowDownToLine, Ban, Download, MessageCircle, PenLine, X } from "lucide-react";
 import { Button, Input, Label, jsonFetch } from "@/components/modules/ui-bits";
+import { LinkActions } from "@/components/modules/link-actions";
 import { SignaturePad } from "@/components/platform/signature-pad";
 import { PhotoList } from "@/components/modules/photo-list";
 import { CONDITIONS, CUSTODY_TERMS, ISSUE_STATUS, OUTCOMES, label, money } from "@/lib/modules/equipment-options";
@@ -103,16 +104,14 @@ export function IssueDetail({ id, data, reload, go, onClose }: { id: string; dat
 
       {x.status === "awaiting_signature" && panel !== "sign" && (
         <Section title={reminder && x.reminderCount ? "Remind" : "Waiting for their signature"}>
-          <p className="break-all rounded-md bg-muted/50 p-2 font-mono text-xs">{x.signingUrl}</p>
-          <div className="flex flex-wrap gap-2">
+          <LinkActions url={x.signingUrl} title={`Equipment custody - ${x.employeeName}`}>
             <Button size="sm" asChild className="bg-green-600 text-white hover:bg-green-700">
               <a href={waSign} target="_blank" rel="noreferrer" onClick={() => act({ action: "remind" }, "Reminder logged")}>
                 <MessageCircle className="size-4" />WhatsApp{isWaPhone(x.employeePhone) ? "" : "…"}
               </a>
             </Button>
-            <Button size="sm" variant="outline" onClick={() => navigator.clipboard.writeText(x.signingUrl).then(() => setMsg("Link copied"))}><Copy className="size-4" />Copy link</Button>
             <Button size="sm" variant="outline" onClick={() => setPanel("sign")}><PenLine className="size-4" />Sign on this device</Button>
-          </div>
+          </LinkActions>
         </Section>
       )}
 
@@ -150,7 +149,7 @@ export function IssueDetail({ id, data, reload, go, onClose }: { id: string; dat
         <Section title="Handback">
           <p className="text-sm">Condition {label(CONDITIONS, x.conditionOut).toLowerCase()} → {x.conditionIn ? label(CONDITIONS, x.conditionIn).toLowerCase() : "-"} · {label(OUTCOMES, x.outcome)}</p>
           {x.damageNotes && <p className="text-sm text-muted-foreground">{x.damageNotes}</p>}
-          {x.repairCost != null && <p className="text-sm">Cost: {money(x.repairCost)}{x.deductibleId ? " · deductible raised in the Ledger" : ""}</p>}
+          {x.repairCost != null && <p className="text-sm">Cost: {money(x.repairCost)}{x.deductibleId ? " · deductible raised in the AOD Book" : ""}</p>}
           {x.photos.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {x.photos.map((p) => (
@@ -190,7 +189,7 @@ export function IssueDetail({ id, data, reload, go, onClose }: { id: string; dat
             <Input id="lost-amt" inputMode="decimal" className="max-w-40" placeholder={item?.value != null ? String(item.value) : "0.00"} value={amount} onChange={(e) => setAmount(e.target.value)} />
           </div>
           {data.modules.ledger && (
-            <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5 size-4" checked={deduct} onChange={(e) => setDeduct(e.target.checked)} />Raise a deductible in the Loan &amp; Deductible Ledger (the employee must still sign consent)</label>
+            <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-0.5 size-4" checked={deduct} onChange={(e) => setDeduct(e.target.checked)} />Raise a deductible in the AOD Book (the employee must still sign consent)</label>
           )}
           <PhotoList value={photos} onChange={setPhotos} max={1} label="Photo / SAPS form" />
           <div className="flex gap-2">

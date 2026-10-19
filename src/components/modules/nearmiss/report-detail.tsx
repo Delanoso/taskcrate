@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Camera, FileText, Link2, MessageCircle, RotateCcw, Trash2, X } from "lucide-react";
+import { Camera, FileText, MessageCircle, RotateCcw, Trash2, X } from "lucide-react";
 import { Button, Input, Label, jsonFetch } from "@/components/modules/ui-bits";
+import { LinkActions } from "@/components/modules/link-actions";
 import { selectClass, textareaClass } from "@/components/modules/nearmiss/report-form";
 import { fmtDate, type Report } from "@/components/modules/nearmiss/types";
 import { fileToCompressedDataUrl } from "@/lib/image-compress";
@@ -152,11 +153,7 @@ export function ReportDetail({
             <a href={waLink(report.reporterContact, waText)} target="_blank" rel="noreferrer"><MessageCircle className="size-4" />WhatsApp reporter</a>
           </Button>
         )}
-        {report.trackingUrl && (
-          <Button size="sm" variant="outline" onClick={() => navigator.clipboard.writeText(report.trackingUrl!).then(() => setSaved("Tracking link copied"))}>
-            <Link2 className="size-4" />Copy tracking link
-          </Button>
-        )}
+        {report.trackingUrl && <LinkActions url={report.trackingUrl} showUrl={false} title={`Track ${report.reference}`} />}
         {canManage && (
           <Button size="sm" variant="ghost" className="text-destructive" disabled={busy === "delete"} onClick={remove}>
             <Trash2 className="size-4" />Delete

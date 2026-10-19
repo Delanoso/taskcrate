@@ -1,6 +1,4 @@
 import { createHash } from "crypto";
-import { RENT_ZAR } from "@/data/products";
-import { isAcceptedCharge, monthQuote } from "@/lib/pricing";
 
 /** PayFast expects PHP urlencode: spaces as +, hex in uppercase. */
 export function payfastEncode(value: string, trim = true) {
@@ -16,95 +14,95 @@ export function payfastEncode(value: string, trim = true) {
     .replace(/%[0-9a-f]{2}/gi, (match) => match.toUpperCase());
 }
 
-export function payfastParamString(entries: Array<[string, string]>) {
-  return entries
-    .filter(([key, value]) => key !== "signature" && value !== "")
-    .map(([key, value]) => `${key}=${payfastEncode(value)}`)
-    .join("&");
-}
+const md5 = (s: string) => createHash("md5").update(s).digest("hex");
 
-export function payfastItnString(entries: Array<[string, string]>) {
-  return entries.map(([key, value]) => `${key}=${payfastEncode(value, false)}`).join("&");
-}
+export type PayfastConfig = { sandbox: boolean; merchantId: string; merchantKey: string; passphrase: string; host: string };
 
-export function payfastItnSignature(entries: Array<[string, string]>, passphrase?: string) {
-  let param = payfastItnString(entries);
-  if (passphrase) param += `&passphrase=${payfastEncode(passphrase)}`;
-  return createHash("md5").update(param).digest("hex");
-}
-export function payfastSignature(fields: Record<string, string>, passphrase?: string) {
-  let param = payfastParamString(Object.entries(fields));
-  if (passphrase) param += `&passphrase=${payfastEncode(passphrase)}`;
-  return createHash("md5").update(param).digest("hex");
-}
-
-export function payfastHost() {
-  return process.env.PAYFAST_SANDBOX === "false" ? "www.payfast.co.za" : "sandbox.payfast.co.za";
-}
-
-export function payfastConfigured() {
-  return Boolean(process.env.PAYFAST_MERCHANT_ID && process.env.PAYFAST_MERCHANT_KEY);
-}
-
-export function buildPayfastFields(input: {
-  appUrl: string;
-  productSlug: string;
-  productName: string;
-  email: string;
-  fullName: string;
-  companyName: string;
-}) {
-  const quote = monthQuote();
+/**
+ * Live settings come from PAYFAST_MERCHANT_ID / _KEY / _PASSPHRASE.
+ * Sandbox defaults to PayFast's public test merchant; PAYFAST_SANDBOX_* overrides it.
+ */
+export function payfastConfig(sandbox: boolean): PayfastConfig {
+  if (sandbox) {
+    return {
+      sandbox: true,
+      merchantId: process.env.PAYFAST_SANDBOX_MERCHANT_ID || "10000100",
+      merchantKey: process.env.PAYFAST_SANDBOX_MERCHANT_KEY || "46f0cd694581a",
+      passphrase: process.env.PAYFAST_SANDBOX_PASSPHRASE || "jt7NOE43FZPn",
+      host: "sandbox.payfast.co.za",
+    };
+  }
   return {
-    merchant_id: process.env.PAYFAST_MERCHANT_ID ?? "",
-    merchant_key: process.env.PAYFAST_MERCHANT_KEY ?? "",
-    return_url: `${input.appUrl}/checkout/success?provider=payfast&product=${input.productSlug}`,
-    cancel_url: `${input.appUrl}/products/${input.productSlug}`,
-    notify_url: `${input.appUrl}/api/webhooks/payfast`,
-    name_first: input.fullName.split(" ")[0] ?? input.fullName,
-    name_last: input.fullName.split(" ").slice(1).join(" ") || "Customer",
-    email_address: input.email,
-    m_payment_id: `${input.productSlug}-${Date.now()}`,
-    amount: quote.amount.toFixed(2),
-    item_name: `${input.productName} — monthly rent`,
-    custom_str1: input.productSlug,
-    custom_str2: input.email,
-    custom_str3: input.companyName,
-    custom_str4: input.fullName,
-    subscription_type: "1",
-    billing_date: quote.billingDate,
-    recurring_amount: RENT_ZAR.toFixed(2),
-    frequency: "3",
-    cycles: "0",
+    sandbox: false,
+    merchantId: process.env.PAYFAST_MERCHANT_ID ?? "",
+    merchantKey: process.env.PAYFAST_MERCHANT_KEY ?? "",
+    passphrase: process.env.PAYFAST_PASSPHRASE ?? "",
+    host: "www.payfast.co.za",
   };
 }
 
-export function payfastFormHtml(fields: Record<string, string>) {
-  const action = `https://${payfastHost()}/eng/process`;
-  const inputs = Object.entries(fields)
-    .map(([key, value]) => `<input type="hidden" name="${escapeHtml(key)}" value="${escapeHtml(value)}" />`)
-    .join("");
-  return `<!doctype html><html><body><p>Redirecting to PayFast…</p><form id="pf" action="${action}" method="post">${inputs}</form><script>document.getElementById('pf').submit()</script></body></html>`;
+/** Recurring billing on PayFast only works with a passphrase on the merchant account. */
+export function payfastReady(cfg: PayfastConfig) {
+  return !!(cfg.merchantId && cfg.merchantKey && cfg.passphrase);
 }
 
-export async function confirmPayfastItn(paramString: string) {
-  const res = await fetch(`https://${payfastHost()}/eng/query/validate`, {
+/** Checkout signature: fields in PayFast's documented order, blanks left out, passphrase last. */
+export function checkoutSignature(fields: [string, string][], passphrase: string) {
+  let s = fields.filter(([, v]) => v !== "").map(([k, v]) => `${k}=${payfastEncode(v)}`).join("&");
+  if (passphrase) s += `&passphrase=${payfastEncode(passphrase)}`;
+  return md5(s);
+}
+
+/** ITN signature: every posted field in the order received, up to (not including) signature. */
+export function itnParamString(entries: [string, string][]) {
+  return entries.map(([k, v]) => `${k}=${payfastEncode(v, false)}`).join("&");
+}
+export function itnSignature(entries: [string, string][], passphrase: string) {
+  let s = itnParamString(entries);
+  if (passphrase) s += `&passphrase=${payfastEncode(passphrase)}`;
+  return md5(s);
+}
+
+export async function confirmWithPayfast(cfg: PayfastConfig, paramString: string) {
+  const res = await fetch(`https://${cfg.host}/eng/query/validate`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: paramString,
   });
-  const text = (await res.text()).trim();
-  return text === "VALID";
+  return (await res.text()).trim() === "VALID";
 }
 
-export function amountMatchesRent(amountGross: string) {
-  return isAcceptedCharge(amountGross);
+export function checkoutFormHtml(cfg: PayfastConfig, fields: [string, string][]) {
+  const all: [string, string][] = [...fields.filter(([, v]) => v !== ""), ["signature", checkoutSignature(fields, cfg.passphrase)]];
+  const inputs = all.map(([k, v]) => `<input type="hidden" name="${esc(k)}" value="${esc(v)}" />`).join("");
+  return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="font-family:system-ui;padding:2rem;text-align:center"><p>Taking you to PayFast…</p><form id="pf" action="https://${cfg.host}/eng/process" method="post">${inputs}<noscript><button type="submit">Continue to PayFast</button></noscript></form><script>document.getElementById('pf').submit()</script></body></html>`;
 }
 
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/"/g, "&quot;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+/** Signed call to the PayFast subscriptions API (cancel, fetch). */
+export async function payfastApi(cfg: PayfastConfig, method: "GET" | "PUT", path: string, body: Record<string, string> = {}) {
+  const timestamp = `${new Date().toISOString().slice(0, 19)}+00:00`;
+  const headers: Record<string, string> = { "merchant-id": cfg.merchantId, version: "v1", timestamp };
+  const signed: Record<string, string> = { ...headers, ...body, passphrase: cfg.passphrase };
+  const signature = md5(Object.keys(signed).sort().map((k) => `${k}=${payfastEncode(signed[k])}`).join("&"));
+  const url = `https://api.payfast.co.za${path}${cfg.sandbox ? "?testing=true" : ""}`;
+  const res = await fetch(url, {
+    method,
+    headers: { ...headers, signature, ...(method === "PUT" ? { "Content-Type": "application/json" } : {}) },
+    body: method === "PUT" ? JSON.stringify(body) : undefined,
+  });
+  const text = await res.text();
+  let data: unknown = text;
+  try {
+    data = JSON.parse(text);
+  } catch {}
+  return { ok: res.ok, status: res.status, data };
+}
+
+/** Page where the payer replaces the card behind a debit order. */
+export function updateCardUrl(cfg: PayfastConfig, token: string, returnUrl: string) {
+  return `https://${cfg.host}/eng/recurring/update/${token}?return=${encodeURIComponent(returnUrl)}`;
+}
+
+function esc(value: string) {
+  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
