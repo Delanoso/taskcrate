@@ -80,7 +80,7 @@ export function serializeAod(r: Full, now = currentPeriod()) {
     }),
     payments: r.payments
       .slice()
-      .sort((a, b) => a.paidOn.getTime() - b.paidOn.getTime())
+      .sort((a, b) => a.paidOn.getTime() - b.paidOn.getTime() || a.createdAt.getTime() - b.createdAt.getTime())
       .map((p) => ({ id: p.id, amount: p.amount, paidOn: saDateKey(p.paidOn), method: p.method, payrollPeriod: p.payrollPeriod, note: p.note, createdBy: p.createdBy })),
   };
 }
