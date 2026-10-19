@@ -5,6 +5,10 @@ const nextConfig: NextConfig = {
   // "uncached data" Insights and can surface false Runtime SyntaxErrors.
   // Keep the app as ordinary dynamic request rendering for reliability.
   devIndicators: false,
+  // The VPS (~2 GB, shared) runs out of memory in the build's TypeScript step.
+  // Type checking runs before every commit instead; the deploy script sets this flag.
+  typescript: { ignoreBuildErrors: process.env.TASKCRATE_SKIP_TYPECHECK === "1" },
+  experimental: { serverSourceMaps: false },
   // Allow HTTPS tunnel hosts (Safari / iPad demos) to hit the Next.js server.
   allowedDevOrigins: [
     "*.lhr.life",
