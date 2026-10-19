@@ -2,6 +2,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { parsePayrollRows, type PayrollImportRow } from "@/lib/modules/payroll-import";
 import { calculatePayslip, dobFromSaId, payDateFor, randsToCents } from "@/lib/modules/payroll-tax";
+import { aodDeductionsFor, matchDeductions, recordPayrollDeductions, reversePayrollDeductions } from "@/lib/modules/aod-payroll";
 
 export class PayrollError extends Error {}
 
@@ -228,6 +229,7 @@ export async function calculatePayroll(organizationId: string, period: string, e
   const employees = await db.payrollEmployee.findMany({ where: { organizationId, active: true }, orderBy: { fullName: "asc" } });
   if (!employees.length) throw new PayrollError("Add at least one active employee");
   const payDate = payDateFor(period, profile.payDay);
+  const aod = matchDeductions(await aodDeductionsFor(organizationId, period), employees).byEmployee;
   const lines = employees.map((employee) => {
     const onceOff = randsToCents(Number(extras[employee.id] ?? 0) || 0);
     const pay = calculatePayslip({
@@ -245,6 +247,7 @@ export async function calculatePayroll(organizationId: string, period: string, e
       dateOfBirth: employee.dateOfBirth,
     });
     const notes = [...pay.notes];
+    const debt = aod.get(employee.id);
     if (!employee.taxNumber) notes.push("No tax number on file.");
     if (!employee.accountNumber) notes.push("No bank account on file.");
     return {
@@ -270,7 +273,9 @@ export async function calculatePayroll(organizationId: string, period: string, e
       sdlCents: pay.sdlCents,
       medicalCreditCents: pay.medicalCreditCents,
       medicalDeductionCents: employee.medicalDeductionCents,
-      netCents: pay.netCents,
+      otherDeductionCents: debt?.cents ?? 0,
+      otherDeductionNote: debt ? `AOD repayment (${debt.refs.join(", ")})` : null,
+      netCents: pay.netCents - (debt?.cents ?? 0),
       employerCostCents: pay.employerCostCents,
       ageAtYearEnd: pay.ageAtYearEnd,
       rebateLabel: pay.rebateLabel,
@@ -304,11 +309,16 @@ export async function finalisePayroll(organizationId: string, period: string) {
   if (short.length) {
     throw new PayrollError(`Deductions are higher than the pay for ${short.map((line) => line.fullName).join(", ")}.`);
   }
-  return db.payrollRun.update({ where: { id: run.id }, data: { status: "FINALISED", finalisedAt: new Date() } });
+  const finalised = await db.payrollRun.update({ where: { id: run.id }, data: { status: "FINALISED", finalisedAt: new Date() } });
+  const staff = await db.payrollEmployee.findMany({ where: { id: { in: run.lines.filter((l) => l.otherDeductionCents > 0).map((l) => l.employeeId!).filter(Boolean) } }, select: { id: true, fullName: true, employeeNumber: true } });
+  const matched = matchDeductions(await aodDeductionsFor(organizationId, period), staff).byEmployee;
+  await recordPayrollDeductions(organizationId, period, "Payroll", [...matched.values()].flatMap((m) => m.recordIds));
+  return finalised;
 }
 
 export async function reopenPayroll(organizationId: string, period: string) {
   const run = await db.payrollRun.findUnique({ where: { organizationId_period: { organizationId, period } } });
   if (!run) throw new PayrollError("That month has not been run");
+  await reversePayrollDeductions(organizationId, period);
   return db.payrollRun.update({ where: { id: run.id }, data: { status: "OPEN", finalisedAt: null } });
 }

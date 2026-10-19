@@ -42,6 +42,7 @@ type Line = {
   sdlCents: number;
   pensionCents: number;
   medicalDeductionCents: number;
+  otherDeductionCents: number;
   netCents: number;
   employerCostCents: number;
   note: string | null;
@@ -396,7 +397,10 @@ export function PayrollAdmin() {
                           <td className="p-1">{formatRand(line.grossCents)}</td>
                           <td className="p-1">{formatRand(line.payeCents)}</td>
                           <td className="p-1">{formatRand(line.uifEmployeeCents)}</td>
-                          <td className="p-1">{formatRand(line.netCents)}</td>
+                          <td className="p-1">
+                            {formatRand(line.netCents)}
+                            {line.otherDeductionCents > 0 && <span className="block text-xs text-muted-foreground">after AOD {formatRand(line.otherDeductionCents)}</span>}
+                          </td>
                           <td className="p-1"><a className="underline" href={`/api/modules/payroll/payslip/${line.id}/pdf`} target="_blank" rel="noreferrer">Payslip</a></td>
                         </tr>
                       ))}

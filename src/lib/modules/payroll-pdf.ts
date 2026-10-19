@@ -59,6 +59,7 @@ export async function buildPayslipPdf(organizationId: string, lineId: string) {
   doc.field("UIF (employee 1%)", formatRand(line.uifEmployeeCents));
   if (line.pensionCents) doc.field("Pension or provident", formatRand(line.pensionCents));
   if (line.medicalDeductionCents) doc.field("Medical aid", formatRand(line.medicalDeductionCents));
+  if (line.otherDeductionCents) doc.field(line.otherDeductionNote ?? "Other deductions", formatRand(line.otherDeductionCents), 220);
   doc.field("Net pay", formatRand(line.netCents));
 
   doc.heading("Paid by the company");

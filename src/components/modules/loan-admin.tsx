@@ -1,73 +1,55 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Button, Input, Label, Card, CardContent, CardHeader, CardTitle, LinkBox, StatusBadge, jsonFetch } from "@/components/modules/ui-bits";
-import { PhotoInput } from "@/components/modules/photo-input";
+import { useCallback, useEffect, useState } from "react";
+import { BookOpen, FilePlus2, ListChecks, Wallet } from "lucide-react";
+import { jsonFetch } from "@/components/modules/ui-bits";
+import { AodListTab } from "@/components/modules/aod/list-tab";
+import { AodForm } from "@/components/modules/aod/aod-form";
+import { PayrollTab } from "@/components/modules/aod/payroll-tab";
+import { ReasonsTab } from "@/components/modules/aod/reasons-tab";
+import type { AodData } from "@/components/modules/aod/types";
+
+const TABS = [
+  { key: "list", label: "AODs", icon: BookOpen },
+  { key: "new", label: "New AOD", icon: FilePlus2 },
+  { key: "payroll", label: "Salary deductions", icon: Wallet },
+  { key: "reasons", label: "Reasons", icon: ListChecks },
+] as const;
+type Tab = (typeof TABS)[number]["key"];
 
 export function LoanAdmin() {
-  const [items, setItems] = useState<any[]>([]);
-  const [form, setForm] = useState({ employeeName: "", employeeNumber: "", recordType: "loan", amount: "", description: "", repaymentNote: "", photoDataUrl: "" });
-  const appUrl = typeof window !== "undefined" ? window.location.origin : "";
+  const [data, setData] = useState<AodData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>("list");
+  const [selected, setSelected] = useState<string | null>(null);
 
-  async function load() { setItems((await jsonFetch("/api/modules/loan")).items); }
-  useEffect(() => { load().catch(console.error); }, []);
+  const reload = useCallback(
+    () => jsonFetch<AodData>("/api/modules/loan").then((d) => { setData(d); return d; }).catch((e) => { setError(e instanceof Error ? e.message : "Could not load"); return null; }),
+    [],
+  );
+  useEffect(() => {
+    reload().then((d) => d && !d.records.length && setTab("new"));
+  }, [reload]);
 
-  async function create(e: React.FormEvent) {
-    e.preventDefault();
-    await jsonFetch("/api/modules/loan", {
-      method: "POST",
-      body: JSON.stringify({
-        employeeName: form.employeeName,
-        employeeNumber: form.employeeNumber || undefined,
-        recordType: form.recordType,
-        amount: Number(form.amount),
-        description: form.description,
-        repaymentNote: form.repaymentNote || undefined,
-        photoDataUrl: form.photoDataUrl || undefined,
-      }),
-    });
-    setForm({ employeeName: "", employeeNumber: "", recordType: "loan", amount: "", description: "", repaymentNote: "", photoDataUrl: "" });
-    load();
-  }
+  if (error) return <p className="text-sm text-destructive">{error}</p>;
+  if (!data) return <p className="text-sm text-muted-foreground">Loading the AOD Book…</p>;
+  const waiting = data.records.filter((r) => r.status === "pending").length;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <Card>
-        <CardHeader><CardTitle>Create AOD / deductible</CardTitle></CardHeader>
-        <CardContent>
-          <form onSubmit={create} className="space-y-3">
-            <Input placeholder="Employee" value={form.employeeName} onChange={(e) => setForm({ ...form, employeeName: e.target.value })} required />
-            <Input placeholder="Employee number" value={form.employeeNumber} onChange={(e) => setForm({ ...form, employeeNumber: e.target.value })} />
-            <select className="h-9 w-full rounded-md border px-2 text-sm" value={form.recordType} onChange={(e) => setForm({ ...form, recordType: e.target.value })}>
-              <option value="loan">Loan / advance (AOD)</option>
-              <option value="deductible">Incident deductible</option>
-            </select>
-            <Input type="number" step="0.01" placeholder="Amount" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
-            <textarea className="min-h-20 w-full rounded-md border p-2 text-sm" placeholder="What the amount is for" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required />
-            <textarea className="min-h-16 w-full rounded-md border p-2 text-sm" placeholder="How it comes off the payslip" value={form.repaymentNote} onChange={(e) => setForm({ ...form, repaymentNote: e.target.value })} />
-            <PhotoInput label="Photo proof (optional)" onChange={(u) => setForm({ ...form, photoDataUrl: u ?? "" })} />
-            <Button type="submit">Create signing link</Button>
-          </form>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>Records</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Button size="sm" variant="outline" asChild>
-            <a href="/api/modules/loan/export">Download Excel</a>
-          </Button>
-          {items.map((i) => (
-            <div key={i.id} className="rounded-md border p-3 text-sm">
-              <div className="flex justify-between"><span className="font-medium">{i.employeeName} · {i.amount}</span><StatusBadge status={i.status} /></div>
-              <p className="text-muted-foreground">{i.recordType}: {i.description}</p>
-              <a className="text-xs underline" href={`/api/modules/loan/${i.id}/pdf`} target="_blank" rel="noreferrer">Download PDF</a>
-              <LinkBox url={`${appUrl}/p/loan/${i.publicToken}`} />
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+    <div className="space-y-4">
+      <div className="flex gap-1 overflow-x-auto border-b">
+        {TABS.map(({ key, label, icon: Icon }) => (
+          <button key={key} type="button" onClick={() => setTab(key)}
+            className={`flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${tab === key ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+            <Icon className="size-4" />{label}
+            {key === "list" && waiting > 0 && <span className="rounded-full bg-amber-500 px-1.5 text-xs text-white" title="Waiting for a signature">{waiting}</span>}
+          </button>
+        ))}
+      </div>
+      {tab === "list" && <AodListTab data={data} reload={reload} selected={selected} setSelected={setSelected} />}
+      {tab === "new" && <AodForm data={data} onCreated={async (id) => { await reload(); setSelected(id); setTab("list"); }} />}
+      {tab === "payroll" && <PayrollTab data={data} reload={reload} />}
+      {tab === "reasons" && <ReasonsTab data={data} reload={reload} />}
     </div>
   );
 }

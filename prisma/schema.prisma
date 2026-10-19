@@ -83,6 +83,7 @@ model Organization {
   equipmentLogs  EquipmentCustodyLog[]
   equipmentIssues EquipmentIssue[]
   loanRecords    LoanDeductibleRecord[]
+  aodReasons     AodReason[]
   jobCards       JobCard[]
   stockItems     StockItem[]
   vehicles       Vehicle[]
@@ -923,22 +924,76 @@ model EquipmentCustodyLog {
 }
 
 // ——— Loan / Deductible ———
+/// An Acknowledgement of Debt: what is owed, why, how it is repaid, and the employee's signed consent.
 model LoanDeductibleRecord {
+  id                 String       @id @default(cuid())
+  organizationId     String
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  publicToken        String       @unique @default(cuid())
+  reference          String?
+  employeeName       String
+  employeeNumber     String?
+  employeePhone      String?
+  employeeIdNumber   String?
+  recordType         String // loan|deductible (deductible = loss/damage, BCEA s34(2) limits apply)
+  reason             String       @default("other")
+  reasonLabel        String?
+  amount             Float
+  description        String
+  incidentDate       DateTime?
+  repaymentNote      String?
+  instalmentAmount   Float?
+  firstPeriod        String? // YYYY-MM of the first deduction
+  repayMethod        String       @default("payroll") // payroll|cash|eft
+  photoUrl           String?
+  photosJson         String?
+  sourceRef          String?
+  issuedBy           String?
+  status             String       @default("pending") // pending|active|settled|declined|cancelled
+  signatureData      String?
+  signerName         String?
+  signIp             String?
+  signedAt           DateTime?
+  employerSignerName String?
+  employerSignature  String?
+  declinedAt         DateTime?
+  declineReason      String?
+  cancelledAt        DateTime?
+  cancelReason       String?
+  settledAt          DateTime?
+  lastRemindedAt     DateTime?
+  createdAt          DateTime     @default(now())
+  payments           AodPayment[]
+
+  @@index([organizationId])
+}
+
+model AodPayment {
+  id            String               @id @default(cuid())
+  recordId      String
+  record        LoanDeductibleRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  amount        Float
+  paidOn        DateTime
+  method        String // payroll|cash|eft|other
+  payrollPeriod String?
+  note          String?
+  createdBy     String?
+  createdAt     DateTime             @default(now())
+
+  @@index([recordId])
+}
+
+/// Company-specific AOD reasons in addition to the built-in list.
+model AodReason {
   id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  publicToken    String       @unique @default(cuid())
-  employeeName   String
-  employeeNumber String?
-  recordType     String // loan|deductible
-  amount         Float
-  description    String
-  repaymentNote  String?
-  photoUrl       String?
-  signatureData  String?
-  status         String       @default("pending")
-  signedAt       DateTime?
+  label          String
+  kind           String       @default("loan") // loan|deductible
+  archived       Boolean      @default(false)
   createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
 }
 
 // ——— Job Cards ———
@@ -1345,6 +1400,8 @@ model PayrollLine {
   sdlCents              Int              @default(0)
   medicalCreditCents    Int              @default(0)
   medicalDeductionCents Int              @default(0)
+  otherDeductionCents   Int              @default(0)
+  otherDeductionNote    String?
   netCents              Int              @default(0)
   employerCostCents     Int              @default(0)
   ageAtYearEnd          Int?

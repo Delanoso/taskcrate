@@ -139,11 +139,11 @@ const SERVER: Record<string, ProductSandbox> = {
     screenTitle: "AOD consent",
     subtitle: "Employee sign",
     steps: [
-      { id: "read", label: "Review amount due" },
-      { id: "sign", label: "Sign payslip consent" },
+      { id: "read", label: "Read amount and instalments" },
+      { id: "sign", label: "Sign on the phone" },
     ],
     successTitle: "State Transition Success",
-    successBody: "AOD Pending → Signed for payroll.",
+    successBody: "AOD signed → instalments into payroll · balance tracked.",
   },
   "job-card-internal": {
     screenTitle: "Internal job",

@@ -36,6 +36,7 @@ export async function GET(req: Request) {
         rands(line.uifEmployeeCents),
         rands(line.pensionCents),
         rands(line.medicalDeductionCents),
+        rands(line.otherDeductionCents),
         rands(line.netCents),
         rands(line.uifEmployerCents),
         rands(line.sdlCents),
@@ -69,6 +70,7 @@ export async function GET(req: Request) {
         "UIF employee",
         "Pension employee",
         "Medical aid",
+        "AOD repayments",
         "Net pay",
         "UIF company",
         "SDL",
@@ -80,7 +82,7 @@ export async function GET(req: Request) {
         "Note",
       ],
       rows,
-      widths: Array(28).fill(16),
+      widths: Array(29).fill(16),
     });
     return xlsxResponse(bytes, "Payroll runs");
   }

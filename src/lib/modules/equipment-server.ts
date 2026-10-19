@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { requireProductApi } from "@/lib/modules/api-guard";
 import { appUrl, jsonList, saDateKey } from "@/lib/modules/common";
 import { CATEGORIES, CONDITIONS, OUTCOMES, type Checklist } from "@/lib/modules/equipment-options";
+import { nextDocumentNumber } from "@/lib/modules/pdf-kit";
 
 export const ISSUER = "equipment-issuer";
 export const HANDBACK = "equipment-handback";
@@ -176,11 +177,19 @@ export async function raiseDeductible(issue: EquipmentIssue, item: EquipmentItem
   const rec = await db.loanDeductibleRecord.create({
     data: {
       organizationId: issue.organizationId,
+      reference: await nextDocumentNumber(issue.organizationId, "AOD"),
       employeeName: issue.employeeName,
+      employeeNumber: issue.employeeNumber,
+      employeePhone: issue.employeePhone,
       recordType: "deductible",
+      reason: issue.outcome === "lost" || reason.startsWith("reported lost") || reason === "not returned" ? "loss" : "damage",
       amount,
-      description: `${item.name}${item.assetTag ? ` (${item.assetTag})` : ""} - ${reason}. Ref ${issue.handbackNumber ?? issue.documentNumber}.`.slice(0, 1000),
+      description: `${item.name}${item.assetTag ? ` (${item.assetTag})` : ""} - ${reason}.`.slice(0, 1000),
+      incidentDate: issue.returnedAt ?? new Date(),
       photoUrl,
+      sourceRef: `Equipment ${issue.handbackNumber ?? issue.documentNumber}`,
+      issuedBy: issue.receivedBy,
+      status: "pending",
     },
   });
   await db.notification.create({
@@ -188,7 +197,7 @@ export async function raiseDeductible(issue: EquipmentIssue, item: EquipmentItem
       organizationId: issue.organizationId,
       productSlug: LEDGER,
       title: `Deductible raised for ${issue.employeeName}`,
-      body: `R ${amount.toFixed(2)} for ${item.name}. The employee must sign consent before payroll deducts it.`,
+      body: `R ${amount.toFixed(2)} for ${item.name}. Set the repayment plan in the AOD Book and send it to the employee to sign before anything is deducted.`,
     },
   });
   return rec.id;
