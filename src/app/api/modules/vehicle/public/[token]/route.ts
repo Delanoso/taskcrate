@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { closeTrip, handOverTrip, PretripError, startPretrip, toTripView } from "@/lib/modules/pretrip";
+import { closeTrip, handOverTrip, PretripError, publicPapers, startPretrip, toTripView } from "@/lib/modules/pretrip";
 import { PANEL_SIDES, PRETRIP_CHECKS, tripIsOpen } from "@/lib/modules/pretrip-shared";
 
 const signatureSchema = z.string().startsWith("data:image/").max(500_000);
@@ -29,6 +29,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
       regNumber: vehicle.regNumber,
       make: vehicle.make,
       companyName: vehicle.organization.branding?.displayName ?? vehicle.organization.name,
+      papers: publicPapers(vehicle),
     },
     checks: PRETRIP_CHECKS,
     panels: PANEL_SIDES,

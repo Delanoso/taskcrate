@@ -1,13 +1,15 @@
 import Link from "next/link";
+import { safeReturnPath } from "@/lib/return-path";
 
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; reset?: string }>;
+  searchParams: Promise<{ error?: string; reset?: string; next?: string }>;
 }) {
   const sp = await searchParams;
+  const next = safeReturnPath(sp.next);
 
   return (
     <div className="flex min-h-[80vh] items-center justify-center px-4 py-12">
@@ -18,7 +20,14 @@ export default async function LoginPage({
         </p>
 
         {/* Fully native controls — no Base UI (Safari form name/submit bugs) */}
+        {next?.startsWith("/products") ? (
+          <p className="mt-3 text-sm text-muted-foreground">
+            After you sign in, you can choose the apps to keep and pay.
+          </p>
+        ) : null}
+
         <form action="/api/auth/login" method="post" className="mt-6 space-y-4">
+          {next ? <input type="hidden" name="next" value={next} /> : null}
           <div className="space-y-2">
             <label htmlFor="email" className="block text-sm font-medium">
               Work email

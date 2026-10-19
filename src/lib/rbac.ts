@@ -3,6 +3,7 @@ import { PRODUCTS } from "@/data/products";
 import { expireUnpaidSubscriptions, formatRentDate } from "@/lib/billing";
 import { db } from "@/lib/db";
 import { sendAlertEmail } from "@/lib/mail";
+import { remindCompanyIfDue } from "@/lib/trial-reminder";
 import { isPlatformAdmin } from "@/lib/platform-admin";
 import type { SessionPayload } from "@/lib/session";
 
@@ -50,9 +51,14 @@ export async function getAccessContext(
 
   const org = await db.organization.findUnique({
     where: { id: session.organizationId },
-    select: { name: true, trialEndsAt: true, trialNoticeSent: true },
+    select: { name: true, trialEndsAt: true, trialNoticeSent: true, trialReminderSent: true },
   });
   const trialActive = !!(org?.trialEndsAt && org.trialEndsAt.getTime() > Date.now());
+  if (org?.trialEndsAt && trialActive && !org.trialReminderSent) {
+    void remindCompanyIfDue(session.organizationId).catch((err) => {
+      console.error("Trial reminder failed", err);
+    });
+  }
   if (org?.trialEndsAt && !trialActive && !org.trialNoticeSent) {
     await db.organization.update({
       where: { id: session.organizationId },

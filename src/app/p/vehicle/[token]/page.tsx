@@ -5,9 +5,15 @@ import { useParams } from "next/navigation";
 import { CloseForm, HandoverForm, PretripForm, type ClosePayload, type HandoverPayload, type PretripPayload } from "@/components/modules/pretrip-forms";
 import { TripSheet } from "@/components/modules/pretrip-sheet";
 import { Button } from "@/components/modules/ui-bits";
-import { formatKm, formatWhen, type TripView } from "@/lib/modules/pretrip-shared";
+import { formatKm, formatWhen, paperStateLabel, type PaperState, type TripView } from "@/lib/modules/pretrip-shared";
 
-type VehicleInfo = { name: string; regNumber: string; make: string | null; companyName: string };
+type VehicleInfo = {
+  name: string;
+  regNumber: string;
+  make: string | null;
+  companyName: string;
+  papers: { label: string; expiresOn: string | null; state: PaperState }[];
+};
 
 export default function Page() {
   const { token } = useParams<{ token: string }>();
@@ -72,6 +78,13 @@ export default function Page() {
         <h1 className="text-xl font-semibold">{vehicle.name} · {vehicle.regNumber}</h1>
         {vehicle.make && <p className="text-sm text-muted-foreground">{vehicle.make}</p>}
         {lastEndKm != null && <p className="mt-1 text-sm">Last recorded {formatKm(lastEndKm)}</p>}
+        <ul className="mt-2 space-y-1 text-sm">
+          {vehicle.papers?.map((paper) => (
+            <li key={paper.label}>
+              {paper.label}: {paperStateLabel(paper.state)}{paper.expiresOn ? ` · ${paper.expiresOn}` : ""}
+            </li>
+          ))}
+        </ul>
       </div>
 
       {saved && (

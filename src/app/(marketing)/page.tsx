@@ -14,12 +14,12 @@ export default function HomePage() {
         <div className="relative mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-28">
           <p className="text-sm font-medium text-primary">TaskCrate</p>
           <h1 className="mt-3 max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl">
-            Rent premium ops apps for {formatRentLabel()}.
+            The paper files a site company still gets asked for.
           </h1>
           <p className="mt-5 max-w-2xl text-lg text-muted-foreground">
-            Browse every app with no sign-in. Register for a 7-day trial of all of them, with no card.
-            After that, the first payment covers only the days left in the month, then the full rent
-            runs on the 1st.
+            Safety, people, vehicles, stock, quotes, and pay. Each app keeps the names, photos,
+            signatures, and dates, then downloads as a PDF or Excel. Rent one for {formatRentLabel()},
+            or try every app for 7 days with no card.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button size="lg" asChild>
@@ -61,8 +61,8 @@ export default function HomePage() {
 
       <section id="apps" className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
         <h2 className="text-2xl font-semibold tracking-tight">All apps</h2>
-        <p className="mt-1 text-muted-foreground">
-          Tap each phone sandbox for State Transition Success, then rent when ready.
+        <p className="mt-1 max-w-2xl text-muted-foreground">
+          Each card names the problem, then the features that close it. Open an app for the full list.
         </p>
         {[...byCat.entries()].map(([category, products]) => (
           <div key={category} className="mt-12">

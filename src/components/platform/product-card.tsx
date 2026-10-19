@@ -33,9 +33,9 @@ export function ProductCard({
       </CardHeader>
       <CardContent className="flex-1 space-y-4">
         <PhoneSandbox productSlug={product.slug} compact />
-        <p className="text-sm text-muted-foreground line-clamp-3">{product.description}</p>
+        <p className="text-sm leading-relaxed">{product.solves}</p>
         <ul className="space-y-1 text-sm">
-          {product.features.slice(0, 3).map((f) => (
+          {product.features.slice(0, 4).map((f) => (
             <li key={f} className="text-muted-foreground">
               · {f}
             </li>
@@ -56,7 +56,7 @@ export function ProductCard({
           </HardLink>
         ) : (
           <Button asChild className="w-full flex-1">
-            <Link href={`/products/${product.slug}#purchase`}>Rent R1,000/mo</Link>
+            <Link href={`/products/${product.slug}#purchase`}>Rent {formatRentLabel()}</Link>
           </Button>
         )}
       </CardFooter>

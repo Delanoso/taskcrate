@@ -57,8 +57,12 @@ export default async function ProductDetailPage({
           <Badge variant="secondary">{product.category}</Badge>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight">{product.name}</h1>
           <p className="mt-3 text-lg text-muted-foreground">{product.tagline}</p>
-          <p className="mt-6 leading-relaxed text-muted-foreground">{product.description}</p>
-          <ul className="mt-8 space-y-2">
+          <h2 className="mt-8 text-sm font-medium tracking-wide text-foreground uppercase">The problem</h2>
+          <p className="mt-2 leading-relaxed">{product.solves}</p>
+          <h2 className="mt-8 text-sm font-medium tracking-wide text-foreground uppercase">How it works</h2>
+          <p className="mt-2 leading-relaxed text-muted-foreground">{product.description}</p>
+          <h2 className="mt-8 text-sm font-medium tracking-wide text-foreground uppercase">What is included</h2>
+          <ul className="mt-3 space-y-2">
             {product.features.map((f) => (
               <li key={f} className="flex gap-2 text-sm">
                 <span className="text-primary">✓</span>
@@ -81,7 +85,7 @@ export default async function ProductDetailPage({
             </p>
             <PhoneSandbox productSlug={product.slug} />
             <p className="mt-3 max-w-[220px] text-center text-xs text-muted-foreground lg:text-left">
-              Tap through the highlighted actions for a State Transition Success in seconds.
+              Tap through a short example of the app.
             </p>
           </div>
         </div>

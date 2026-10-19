@@ -15,7 +15,7 @@ function staffFrom() {
   return process.env.SMTP_FROM || process.env.SMTP_USER || "erich@delanosolutions.co.za";
 }
 
-function customerMailboxReady() {
+export function customerMailReady() {
   return Boolean(process.env.SMTP_CUSTOMER_USER && process.env.SMTP_CUSTOMER_PASS);
 }
 
@@ -23,6 +23,7 @@ async function deliver(input: {
   to: string;
   subject: string;
   text: string;
+  html?: string;
   from: string;
   host: string;
   port: number;
@@ -44,6 +45,7 @@ async function deliver(input: {
       to: input.to,
       subject: input.subject,
       text: input.text,
+      ...(input.html ? { html: input.html } : {}),
     });
     return { ok: true as const };
   } catch (err) {
@@ -52,8 +54,13 @@ async function deliver(input: {
   }
 }
 
-export async function sendCustomerEmail(input: { to: string; subject: string; text: string }) {
-  if (!mailConfigured() || !customerMailboxReady()) {
+export async function sendCustomerEmail(input: {
+  to: string;
+  subject: string;
+  text: string;
+  html?: string;
+}) {
+  if (!mailConfigured() || !customerMailReady()) {
     return {
       ok: false as const,
       error: "The hello@taskcrate.co.za mailbox login is not on the server yet.",
@@ -63,6 +70,7 @@ export async function sendCustomerEmail(input: { to: string; subject: string; te
     to: input.to,
     subject: input.subject,
     text: input.text,
+    html: input.html,
     from: customerFrom(),
     host: process.env.SMTP_CUSTOMER_HOST || "smtp.hmailplus.com",
     port: Number(process.env.SMTP_CUSTOMER_PORT || 587),

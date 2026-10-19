@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireProductApi } from "@/lib/modules/api-guard";
-import { closeTrip, handOverTrip, PretripError, startPretrip, toTripView } from "@/lib/modules/pretrip";
+import { closeTrip, handOverTrip, PretripError, saveVehiclePapers, startPretrip, toTripView, vehiclePapers } from "@/lib/modules/pretrip";
 import { PRETRIP_CHECKS } from "@/lib/modules/pretrip-shared";
 
 const signatureSchema = z.string().startsWith("data:image/").max(500_000);
@@ -69,6 +69,7 @@ export async function GET(req: Request) {
         regNumber: vehicle.regNumber,
         make: vehicle.make,
         publicToken: vehicle.publicToken,
+        ...vehiclePapers(vehicle),
         trips: vehicle.trips.map((trip) => toTripView(trip, true)),
       },
     });
@@ -86,6 +87,9 @@ export async function GET(req: Request) {
       regNumber: vehicle.regNumber,
       make: vehicle.make,
       publicToken: vehicle.publicToken,
+      licenceDiscExpires: vehicle.licenceDiscExpires,
+      insuranceExpires: vehicle.insuranceExpires,
+      roadworthyExpires: vehicle.roadworthyExpires,
       latest: vehicle.trips[0] ? toTripView(vehicle.trips[0], false) : null,
     })),
   });
@@ -101,6 +105,20 @@ export async function POST(req: Request) {
         name: z.string().trim().min(2).max(120),
         regNumber: z.string().trim().min(2).max(20),
         make: z.string().trim().max(80).optional(),
+      }),
+      z.object({
+        action: z.literal("papers"),
+        vehicleId: z.string(),
+        licenceDiscNo: z.string().trim().max(40).optional(),
+        licenceDiscExpires: z.string().trim().max(10).optional(),
+        licenceDiscPhoto: z.string().max(1_500_000).optional(),
+        insurer: z.string().trim().max(120).optional(),
+        insurancePolicyNo: z.string().trim().max(40).optional(),
+        insuranceExpires: z.string().trim().max(10).optional(),
+        insurancePhoto: z.string().max(1_500_000).optional(),
+        roadworthyNo: z.string().trim().max(40).optional(),
+        roadworthyExpires: z.string().trim().max(10).optional(),
+        roadworthyPhoto: z.string().max(1_500_000).optional(),
       }),
       pretripSchema,
       handoverSchema,
@@ -123,6 +141,11 @@ export async function POST(req: Request) {
       where: { id: body.vehicleId, organizationId: gate.session.organizationId },
     });
     if (!vehicle) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    if (body.action === "papers") {
+      await saveVehiclePapers(vehicle, body);
+      return NextResponse.json({ ok: true });
+    }
 
     const trip = body.action === "pretrip"
       ? await startPretrip({ vehicle, ...body })

@@ -1,7 +1,7 @@
 import type { Vehicle, VehicleTripLog } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { saveDataUrlUpload } from "@/lib/uploads";
-import { PANEL_SIDES, PRETRIP_CHECKS, parseChecks, parsePhotos, tripIsOpen, type TripPhoto, type TripView } from "@/lib/modules/pretrip-shared";
+import { PANEL_SIDES, PRETRIP_CHECKS, paperState, parseChecks, parsePhotos, tripIsOpen, type TripPhoto, type TripView } from "@/lib/modules/pretrip-shared";
 
 export class PretripError extends Error {}
 
@@ -22,6 +22,92 @@ function signature(value: string | undefined, message: string) {
 function km(value: number | undefined, message: string) {
   if (value == null || !Number.isInteger(value) || value < 0 || value > 9_999_999) throw new PretripError(message);
   return value;
+}
+
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const PHOTO = /^data:image\/(jpeg|png);base64,/;
+
+export type VehiclePapers = {
+  licenceDiscNo: string | null;
+  licenceDiscExpires: string | null;
+  licenceDiscPhotoUrl: string | null;
+  insurer: string | null;
+  insurancePolicyNo: string | null;
+  insuranceExpires: string | null;
+  insurancePhotoUrl: string | null;
+  roadworthyNo: string | null;
+  roadworthyExpires: string | null;
+  roadworthyPhotoUrl: string | null;
+};
+
+export function vehiclePapers(vehicle: Vehicle): VehiclePapers {
+  return {
+    licenceDiscNo: vehicle.licenceDiscNo,
+    licenceDiscExpires: vehicle.licenceDiscExpires,
+    licenceDiscPhotoUrl: vehicle.licenceDiscPhotoUrl,
+    insurer: vehicle.insurer,
+    insurancePolicyNo: vehicle.insurancePolicyNo,
+    insuranceExpires: vehicle.insuranceExpires,
+    insurancePhotoUrl: vehicle.insurancePhotoUrl,
+    roadworthyNo: vehicle.roadworthyNo,
+    roadworthyExpires: vehicle.roadworthyExpires,
+    roadworthyPhotoUrl: vehicle.roadworthyPhotoUrl,
+  };
+}
+
+export function publicPapers(vehicle: Vehicle) {
+  return [
+    { label: "Licence disc", expiresOn: vehicle.licenceDiscExpires, state: paperState(vehicle.licenceDiscExpires) },
+    { label: "Insurance", expiresOn: vehicle.insuranceExpires, state: paperState(vehicle.insuranceExpires) },
+    { label: "Roadworthy", expiresOn: vehicle.roadworthyExpires, state: paperState(vehicle.roadworthyExpires) },
+  ];
+}
+
+export async function saveVehiclePapers(vehicle: Vehicle, input: {
+  licenceDiscNo?: string;
+  licenceDiscExpires?: string;
+  licenceDiscPhoto?: string;
+  insurer?: string;
+  insurancePolicyNo?: string;
+  insuranceExpires?: string;
+  insurancePhoto?: string;
+  roadworthyNo?: string;
+  roadworthyExpires?: string;
+  roadworthyPhoto?: string;
+}) {
+  for (const [label, value] of [
+    ["licence disc", input.licenceDiscExpires],
+    ["insurance", input.insuranceExpires],
+    ["roadworthy", input.roadworthyExpires],
+  ] as const) {
+    if (value && !DATE.test(value)) throw new PretripError(`The ${label} expiry must be a date.`);
+  }
+  for (const photo of [input.licenceDiscPhoto, input.insurancePhoto, input.roadworthyPhoto]) {
+    if (photo && (!PHOTO.test(photo) || photo.length > 1_500_000)) {
+      throw new PretripError("One of the certificate photos could not be saved. Try a smaller picture.");
+    }
+  }
+  const folder = `vehicle/${vehicle.organizationId}`;
+  const [licenceDiscPhotoUrl, insurancePhotoUrl, roadworthyPhotoUrl] = await Promise.all([
+    input.licenceDiscPhoto ? saveDataUrlUpload(input.licenceDiscPhoto, folder) : Promise.resolve(undefined),
+    input.insurancePhoto ? saveDataUrlUpload(input.insurancePhoto, folder) : Promise.resolve(undefined),
+    input.roadworthyPhoto ? saveDataUrlUpload(input.roadworthyPhoto, folder) : Promise.resolve(undefined),
+  ]);
+  return db.vehicle.update({
+    where: { id: vehicle.id },
+    data: {
+      licenceDiscNo: clean(input.licenceDiscNo, 40),
+      licenceDiscExpires: clean(input.licenceDiscExpires, 10),
+      insurer: clean(input.insurer, 120),
+      insurancePolicyNo: clean(input.insurancePolicyNo, 40),
+      insuranceExpires: clean(input.insuranceExpires, 10),
+      roadworthyNo: clean(input.roadworthyNo, 40),
+      roadworthyExpires: clean(input.roadworthyExpires, 10),
+      ...(licenceDiscPhotoUrl ? { licenceDiscPhotoUrl } : {}),
+      ...(insurancePhotoUrl ? { insurancePhotoUrl } : {}),
+      ...(roadworthyPhotoUrl ? { roadworthyPhotoUrl } : {}),
+    },
+  });
 }
 
 export function toTripView(trip: VehicleTripLog, withSignatures: boolean): TripView {

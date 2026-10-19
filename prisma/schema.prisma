@@ -48,6 +48,7 @@ model Organization {
   trialEndsAt DateTime?
   trialNote  String?
   trialNoticeSent Boolean @default(false)
+  trialReminderSent Boolean @default(false)
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
@@ -86,6 +87,15 @@ model Organization {
   obSites        ObSite[]
   fitSites       FitForDutySite[]
   supportTickets SupportTicket[]
+  billingProfile    BillingProfile?
+  billingTemplates  BillingTemplate[]
+  billingDocuments  BillingDocument[]
+  payrollProfile    PayrollProfile?
+  payrollEmployees  PayrollEmployee[]
+  payrollRuns       PayrollRun[]
+  attendanceSites   AttendanceSite[]
+  accidentReports   AccidentReport[]
+  trainingTickets   TrainingTicket[]
 }
 
 model OrganizationBranding {
@@ -950,10 +960,20 @@ model Vehicle {
   id             String            @id @default(cuid())
   organizationId String
   organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  name           String
-  regNumber      String
-  make           String?
-  publicToken    String            @unique @default(cuid())
+  name                 String
+  regNumber            String
+  make                 String?
+  licenceDiscNo        String?
+  licenceDiscExpires   String?
+  licenceDiscPhotoUrl  String?
+  insurer              String?
+  insurancePolicyNo    String?
+  insuranceExpires     String?
+  insurancePhotoUrl    String?
+  roadworthyNo         String?
+  roadworthyExpires    String?
+  roadworthyPhotoUrl   String?
+  publicToken          String            @unique @default(cuid())
   createdAt      DateTime          @default(now())
   trips          VehicleTripLog[]
 }
@@ -1098,4 +1118,255 @@ model FitForDutyCheck {
   createdAt      DateTime       @default(now())
 
   @@index([siteId])
+}
+
+// ——— Quotations and invoicing ———
+model BillingProfile {
+  id                 String       @id @default(cuid())
+  organizationId     String       @unique
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  legalName          String
+  tradingName        String?
+  registrationNumber String?
+  vatRegistered      Boolean      @default(false)
+  vatNumber          String?
+  vatPercent         Float        @default(15)
+  address            String?
+  email              String?
+  phone              String?
+  bankName           String?
+  accountName        String?
+  accountNumber      String?
+  branchCode         String?
+  accountType        String?
+  defaultCurrency    String       @default("ZAR")
+  paymentTermsDays   Int          @default(30)
+  quoteValidDays     Int          @default(14)
+  terms              String?
+  footerNote         String?
+  updatedAt          DateTime     @updatedAt
+}
+
+model BillingTemplate {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  notes          String?
+  terms          String?
+  linesJson      String
+  createdAt      DateTime     @default(now())
+
+  @@unique([organizationId, name])
+}
+
+model BillingDocument {
+  id               String       @id @default(cuid())
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  kind             String
+  number           String
+  status           String
+  templateName     String?
+  currency         String
+  chargeVat        Boolean      @default(false)
+  vatPercent       Float        @default(0)
+  clientName       String
+  clientCompany    String?
+  clientEmail      String?
+  clientPhone      String?
+  clientAddress    String?
+  clientVatNumber  String?
+  issueDate        String
+  dueDate          String?
+  theirReference   String?
+  notes            String?
+  terms            String?
+  linesJson        String
+  subtotalCents    Int
+  vatCents         Int
+  totalCents       Int
+  paidOn           String?
+  paymentMethod    String?
+  paymentReference String?
+  sourceQuoteId    String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@unique([organizationId, number])
+  @@index([organizationId])
+}
+
+// ——— Payroll ———
+model PayrollProfile {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  payeNumber     String?
+  uifNumber      String?
+  sdlNumber      String?
+  paySdl         Boolean      @default(false)
+  payDay         Int          @default(25)
+  updatedAt      DateTime     @updatedAt
+}
+
+model PayrollEmployee {
+  id                    String          @id @default(cuid())
+  organizationId        String
+  organization          Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  fullName              String
+  employeeNumber        String?
+  idNumber              String?
+  taxNumber             String?
+  dateOfBirth           String?
+  startDate             String?
+  jobTitle              String?
+  email                 String?
+  phone                 String?
+  bankName              String?
+  accountNumber         String?
+  branchCode            String?
+  accountType           String?
+  monthlySalaryCents    Int             @default(0)
+  allowanceCents        Int             @default(0)
+  pensionCents          Int             @default(0)
+  employerPensionCents  Int             @default(0)
+  medicalMember         Boolean         @default(false)
+  medicalDependants     Int             @default(0)
+  medicalDeductionCents Int             @default(0)
+  paysUif               Boolean         @default(true)
+  active                Boolean         @default(true)
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  lines                 PayrollLine[]
+
+  @@index([organizationId])
+}
+
+model PayrollRun {
+  id             String        @id @default(cuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  period         String
+  payDate        String
+  status         String        @default("OPEN")
+  finalisedAt    DateTime?
+  createdAt      DateTime      @default(now())
+  lines          PayrollLine[]
+
+  @@unique([organizationId, period])
+}
+
+model PayrollLine {
+  id                    String           @id @default(cuid())
+  runId                 String
+  run                   PayrollRun       @relation(fields: [runId], references: [id], onDelete: Cascade)
+  employeeId            String?
+  employee              PayrollEmployee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  fullName              String
+  employeeNumber        String?
+  idNumber              String?
+  taxNumber             String?
+  jobTitle              String?
+  bankName              String?
+  accountNumber         String?
+  branchCode            String?
+  basicCents            Int              @default(0)
+  allowanceCents        Int              @default(0)
+  onceOffCents          Int              @default(0)
+  pensionCents          Int              @default(0)
+  employerPensionCents  Int              @default(0)
+  grossCents            Int              @default(0)
+  taxableMonthlyCents   Int              @default(0)
+  payeCents             Int              @default(0)
+  uifEmployeeCents      Int              @default(0)
+  uifEmployerCents      Int              @default(0)
+  sdlCents              Int              @default(0)
+  medicalCreditCents    Int              @default(0)
+  medicalDeductionCents Int              @default(0)
+  netCents              Int              @default(0)
+  employerCostCents     Int              @default(0)
+  ageAtYearEnd          Int?
+  rebateLabel           String?
+  note                  String?
+
+  @@index([runId])
+}
+
+// ——— Site attendance ———
+model AttendanceSite {
+  id             String             @id @default(cuid())
+  organizationId String
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  location       String?
+  publicToken    String             @unique @default(cuid())
+  createdAt      DateTime           @default(now())
+  punches        AttendancePunch[]
+}
+
+model AttendancePunch {
+  id             String         @id @default(cuid())
+  siteId         String
+  site           AttendanceSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  direction      String
+  fullName       String
+  employeeNumber String?
+  photoUrl       String
+  signatureUrl   String
+  note           String?
+  createdAt      DateTime       @default(now())
+
+  @@index([siteId])
+}
+
+// ——— Accident and injury ———
+model AccidentReport {
+  id                String       @id @default(cuid())
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reportNumber      String
+  occurredAt        String
+  location          String
+  injuredName       String
+  employeeNumber    String?
+  idNumber          String?
+  jobTitle          String?
+  activity          String
+  description       String
+  injury            String
+  treatment         String?
+  witnesses         String?
+  actionTaken       String?
+  photoUrl          String?
+  extraPhotoUrl     String?
+  reporterName      String
+  reporterSignature String
+  injuredSignature  String?
+  witnessName       String?
+  witnessSignature  String?
+  createdAt         DateTime     @default(now())
+
+  @@unique([organizationId, reportNumber])
+  @@index([organizationId])
+}
+
+// ——— Training and tickets ———
+model TrainingTicket {
+  id                String       @id @default(cuid())
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  fullName          String
+  employeeNumber    String?
+  ticketType        String
+  certificateNumber String?
+  provider          String?
+  issuedOn          String
+  expiresOn         String
+  photoUrl          String?
+  note              String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@index([organizationId])
 }

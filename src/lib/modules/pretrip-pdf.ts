@@ -17,6 +17,16 @@ export async function buildTripPdf(vehicle: Vehicle & { trips: VehicleTripLog[] 
   doc.field("Name", vehicle.name);
   doc.field("Registration", vehicle.regNumber);
   doc.field("Make", vehicle.make);
+  doc.heading("Papers");
+  doc.field("Licence disc", vehicle.licenceDiscNo);
+  doc.field("Licence disc expires", vehicle.licenceDiscExpires);
+  doc.field("Insurer", vehicle.insurer);
+  doc.field("Policy number", vehicle.insurancePolicyNo);
+  doc.field("Insurance expires", vehicle.insuranceExpires);
+  doc.field("Roadworthy", vehicle.roadworthyNo);
+  doc.field("Roadworthy expires", vehicle.roadworthyExpires);
+  const paperPhotos = [vehicle.licenceDiscPhotoUrl, vehicle.insurancePhotoUrl, vehicle.roadworthyPhotoUrl].filter((url): url is string => !!url);
+  if (paperPhotos.length) await doc.imageRow(paperPhotos, 110);
 
   const trips = [...vehicle.trips].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).slice(-40);
   doc.heading(trips.length ? `Trips (${trips.length})` : "Trips");

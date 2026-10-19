@@ -6,10 +6,10 @@ export default function ProductsPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-      <h1 className="text-3xl font-semibold tracking-tight">Product catalog</h1>
+      <h1 className="text-3xl font-semibold tracking-tight">Every app</h1>
       <p className="mt-2 max-w-2xl text-muted-foreground">
-        No sign-in to browse. Tap each phone sandbox, then rent any app for {formatRentLabel()}.
-        PayFast or Stripe checkout provisions your workspace when payment clears.
+        Browse with no sign-in. Each app is {formatRentLabel()}. A 7-day trial opens all of them, with no card.
+        Open an app to see the problem it solves and everything that is included.
       </p>
       {[...byCat.entries()].map(([category, products]) => (
         <section key={category} className="mt-12">

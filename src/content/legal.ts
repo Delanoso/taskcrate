@@ -49,13 +49,13 @@ Delano Solutions operates TaskCrate at https://taskcrate.co.za. Questions about 
 2. Account information
 When a company registers we store the person's name, work email, cellphone number, company name, the date of registration, and whether a 7-day trial was granted. The password is stored only as a hash. We do not keep the password itself.
 
-We use this information to open the workspace, run the trial, refuse a second trial on the same email, cellphone number, or company name, send password-reset links, answer support tickets, and contact the company about TaskCrate.
+We use this information to open the workspace, run the trial, refuse a second trial on the same email, cellphone number, or company name, send password-reset links and trial reminders, answer support tickets, and contact the company about TaskCrate.
 
 3. Records entered in the apps
 The company owns the records it enters, such as employee, visitor, permit, and similar business records. Delano Solutions stores and displays those records so the Apps can run. We do not sell them.
 
 4. Email
-Account messages, including password-reset links, are sent from hello@taskcrate.co.za.
+Account messages, including password-reset links and trial reminders, are sent from hello@taskcrate.co.za.
 
 5. Payments
 When billing is open, monthly rent is collected by PayFast. Card numbers are handled by PayFast and are not stored in TaskCrate. We store whether an App is paid and the date it is paid until.

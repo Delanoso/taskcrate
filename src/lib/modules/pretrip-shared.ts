@@ -11,6 +11,36 @@ export const PRETRIP_CHECKS = [
   { key: "belts", label: "Seat belts" },
 ] as const;
 
+export type PaperState = "missing" | "expired" | "due" | "valid";
+
+function johannesburgToday() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Johannesburg" });
+}
+
+export function paperState(expiresOn: string | null | undefined, today = johannesburgToday()): PaperState {
+  if (!expiresOn) return "missing";
+  if (expiresOn < today) return "expired";
+  const [year, month, day] = today.split("-").map(Number);
+  const dueBy = new Date(Date.UTC(year, month - 1, day + 30)).toISOString().slice(0, 10);
+  if (expiresOn <= dueBy) return "due";
+  return "valid";
+}
+
+export function paperStateLabel(state: PaperState) {
+  if (state === "missing") return "Not on file";
+  if (state === "expired") return "Expired";
+  if (state === "due") return "Due in 30 days";
+  return "In date";
+}
+
+export function papersHeadline(expires: Array<string | null | undefined>) {
+  const states = expires.map((date) => paperState(date));
+  if (states.includes("expired")) return "A paper has expired";
+  if (states.includes("due")) return "A paper is due in the next 30 days";
+  if (states.includes("missing")) return "Papers still to add";
+  return "Papers in date";
+}
+
 export const PANEL_SIDES = [
   { key: "front", label: "Front" },
   { key: "rear", label: "Rear" },

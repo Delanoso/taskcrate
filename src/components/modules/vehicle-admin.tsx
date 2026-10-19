@@ -2,9 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { CloseForm, HandoverForm, PretripForm, type ClosePayload, type HandoverPayload, type PretripPayload } from "@/components/modules/pretrip-forms";
+import { PhotoInput } from "@/components/modules/photo-input";
 import { TripSheet } from "@/components/modules/pretrip-sheet";
-import { Button, Card, CardContent, CardHeader, CardTitle, Input, LinkBox, jsonFetch } from "@/components/modules/ui-bits";
-import { formatKm, formatWhen, type TripView } from "@/lib/modules/pretrip-shared";
+import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, LinkBox, StatusBadge, jsonFetch } from "@/components/modules/ui-bits";
+import { formatKm, formatWhen, paperState, paperStateLabel, papersHeadline, type TripView } from "@/lib/modules/pretrip-shared";
+
+type VehiclePapers = {
+  licenceDiscNo: string | null;
+  licenceDiscExpires: string | null;
+  licenceDiscPhotoUrl: string | null;
+  insurer: string | null;
+  insurancePolicyNo: string | null;
+  insuranceExpires: string | null;
+  insurancePhotoUrl: string | null;
+  roadworthyNo: string | null;
+  roadworthyExpires: string | null;
+  roadworthyPhotoUrl: string | null;
+};
 
 type VehicleSummary = {
   id: string;
@@ -12,10 +26,13 @@ type VehicleSummary = {
   regNumber: string;
   make: string | null;
   publicToken: string;
+  licenceDiscExpires: string | null;
+  insuranceExpires: string | null;
+  roadworthyExpires: string | null;
   latest: TripView | null;
 };
 
-type VehicleDetail = {
+type VehicleDetail = VehiclePapers & {
   id: string;
   name: string;
   regNumber: string;
@@ -79,6 +96,9 @@ export function VehicleAdmin() {
           >
             <span className="font-medium">{vehicle.name}</span>
             <span className="mt-1 block text-sm text-muted-foreground">{vehicle.regNumber}{vehicle.make ? ` · ${vehicle.make}` : ""}</span>
+            <span className="mt-1 block text-xs text-muted-foreground">
+              {papersHeadline([vehicle.licenceDiscExpires, vehicle.insuranceExpires, vehicle.roadworthyExpires])}
+            </span>
             <span className="mt-1 block text-xs text-muted-foreground">
               {vehicle.latest
                 ? vehicle.latest.open
@@ -206,6 +226,10 @@ function VehicleDesk({
           </Button>
         </CardContent>
       </Card>
+      <PapersForm vehicle={vehicle} onSaved={async () => {
+        const data = await jsonFetch<{ vehicle: VehicleDetail }>(`/api/modules/vehicle?id=${vehicle.id}`);
+        onChange(data.vehicle);
+      }} />
 
       {mode === "pretrip" && (
         <Card>
@@ -238,5 +262,118 @@ function VehicleDesk({
         {vehicle.trips.map((trip) => <TripSheet key={trip.id} trip={trip} />)}
       </div>
     </div>
+  );
+}
+
+function PapersForm({ vehicle, onSaved }: { vehicle: VehicleDetail; onSaved: () => Promise<void> }) {
+  const [form, setForm] = useState({
+    licenceDiscNo: vehicle.licenceDiscNo ?? "",
+    licenceDiscExpires: vehicle.licenceDiscExpires ?? "",
+    insurer: vehicle.insurer ?? "",
+    insurancePolicyNo: vehicle.insurancePolicyNo ?? "",
+    insuranceExpires: vehicle.insuranceExpires ?? "",
+    roadworthyNo: vehicle.roadworthyNo ?? "",
+    roadworthyExpires: vehicle.roadworthyExpires ?? "",
+  });
+  const [licencePhoto, setLicencePhoto] = useState<string | null>(null);
+  const [insurancePhoto, setInsurancePhoto] = useState<string | null>(null);
+  const [roadworthyPhoto, setRoadworthyPhoto] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    setForm({
+      licenceDiscNo: vehicle.licenceDiscNo ?? "",
+      licenceDiscExpires: vehicle.licenceDiscExpires ?? "",
+      insurer: vehicle.insurer ?? "",
+      insurancePolicyNo: vehicle.insurancePolicyNo ?? "",
+      insuranceExpires: vehicle.insuranceExpires ?? "",
+      roadworthyNo: vehicle.roadworthyNo ?? "",
+      roadworthyExpires: vehicle.roadworthyExpires ?? "",
+    });
+  }, [vehicle]);
+
+  function set<K extends keyof typeof form>(key: K, value: string) {
+    setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await jsonFetch("/api/modules/vehicle", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "papers",
+          vehicleId: vehicle.id,
+          ...form,
+          licenceDiscPhoto: licencePhoto || undefined,
+          insurancePhoto: insurancePhoto || undefined,
+          roadworthyPhoto: roadworthyPhoto || undefined,
+        }),
+      });
+      setLicencePhoto(null);
+      setInsurancePhoto(null);
+      setRoadworthyPhoto(null);
+      setNotice("Papers saved.");
+      await onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save the papers.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const rows = [
+    { label: "Licence disc", expires: vehicle.licenceDiscExpires },
+    { label: "Insurance", expires: vehicle.insuranceExpires },
+    { label: "Roadworthy", expires: vehicle.roadworthyExpires },
+  ];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Licence disc, insurance, and roadworthy</CardTitle>
+        <CardDescription>The expiry stays on the vehicle. A paper due in the next 30 days, or already expired, shows on the fleet and on the dash link.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap gap-2">
+          {rows.map((row) => (
+            <span key={row.label} className="inline-flex items-center gap-2 text-sm">
+              {row.label}
+              <StatusBadge status={paperStateLabel(paperState(row.expires))} />
+              {row.expires && <span className="text-muted-foreground">{row.expires}</span>}
+            </span>
+          ))}
+        </div>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        {notice && <p className="text-sm text-green-700">{notice}</p>}
+        <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
+          <label className="block space-y-1 text-sm"><span className="font-medium">Licence disc number</span><Input value={form.licenceDiscNo} onChange={(event) => set("licenceDiscNo", event.target.value)} /></label>
+          <label className="block space-y-1 text-sm"><span className="font-medium">Licence disc expires</span><Input type="date" value={form.licenceDiscExpires} onChange={(event) => set("licenceDiscExpires", event.target.value)} /></label>
+          <div className="sm:col-span-2 space-y-2">
+            {vehicle.licenceDiscPhotoUrl && <img src={vehicle.licenceDiscPhotoUrl} alt="Licence disc" className="h-24 rounded-md border object-cover" />}
+            <PhotoInput label="Photo of the licence disc" onChange={setLicencePhoto} />
+          </div>
+          <label className="block space-y-1 text-sm"><span className="font-medium">Insurer</span><Input value={form.insurer} onChange={(event) => set("insurer", event.target.value)} /></label>
+          <label className="block space-y-1 text-sm"><span className="font-medium">Policy number</span><Input value={form.insurancePolicyNo} onChange={(event) => set("insurancePolicyNo", event.target.value)} /></label>
+          <label className="block space-y-1 text-sm sm:col-span-2"><span className="font-medium">Insurance expires</span><Input type="date" value={form.insuranceExpires} onChange={(event) => set("insuranceExpires", event.target.value)} /></label>
+          <div className="sm:col-span-2 space-y-2">
+            {vehicle.insurancePhotoUrl && <img src={vehicle.insurancePhotoUrl} alt="Insurance certificate" className="h-24 rounded-md border object-cover" />}
+            <PhotoInput label="Photo of the insurance certificate" onChange={setInsurancePhoto} />
+          </div>
+          <label className="block space-y-1 text-sm"><span className="font-medium">Roadworthy number</span><Input value={form.roadworthyNo} onChange={(event) => set("roadworthyNo", event.target.value)} /></label>
+          <label className="block space-y-1 text-sm"><span className="font-medium">Roadworthy expires</span><Input type="date" value={form.roadworthyExpires} onChange={(event) => set("roadworthyExpires", event.target.value)} /></label>
+          <div className="sm:col-span-2 space-y-2">
+            {vehicle.roadworthyPhotoUrl && <img src={vehicle.roadworthyPhotoUrl} alt="Roadworthy certificate" className="h-24 rounded-md border object-cover" />}
+            <PhotoInput label="Photo of the roadworthy certificate" onChange={setRoadworthyPhoto} />
+          </div>
+          <Button type="submit" disabled={busy}>{busy ? "Saving…" : "Save papers"}</Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
