@@ -46,6 +46,7 @@ export async function DashboardShell({
 
   const links = [
     { href: "/dashboard", label: "Overview", active: activePath === "/dashboard", show: true },
+    { href: "/dashboard/people", label: "Staff", active: activePath.includes("/people"), show: true },
     { href: "/dashboard/settings/branding", label: "Branding & PDFs", active: activePath.includes("branding"), show: companyAdmin },
     { href: "/dashboard/settings/team", label: "People & access", active: activePath.includes("team"), show: companyAdmin },
     { href: "/dashboard/settings/password", label: "Account", active: activePath.includes("password"), show: true },

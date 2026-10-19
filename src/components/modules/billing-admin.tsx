@@ -59,7 +59,8 @@ type DocumentRow = DocForm & {
   invoiceNumber: string | null;
   lines: LineInput[];
 };
-type Snapshot = { profile: ProfileForm & { vatRegistered: boolean } | null; templates: Template[]; documents: DocumentRow[] };
+type Client = { id: string; name: string; email: string | null; phone: string | null };
+type Snapshot = { profile: ProfileForm & { vatRegistered: boolean } | null; templates: Template[]; documents: DocumentRow[]; clients?: Client[] };
 
 const field = "h-9 w-full rounded-md border bg-background px-2 text-sm";
 const area = "min-h-16 w-full rounded-md border bg-background p-2 text-sm";
@@ -143,6 +144,7 @@ export function BillingAdmin() {
   const [hasProfile, setHasProfile] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [doc, setDoc] = useState<DocForm>(freshDocument(null));
   const [templateName, setTemplateName] = useState("");
   const [paying, setPaying] = useState({ id: "", paidOn: todayIso(), method: "EFT", reference: "" });
@@ -153,6 +155,7 @@ export function BillingAdmin() {
     const data = await jsonFetch<Snapshot>("/api/modules/billing");
     setTemplates(data.templates);
     setDocuments(data.documents);
+    setClients(data.clients ?? []);
     setHasProfile(Boolean(data.profile));
     if (data.profile) setProfile(profileFrom(data.profile));
     return data;
@@ -394,6 +397,17 @@ export function BillingAdmin() {
                   <input type="checkbox" checked={doc.chargeVat} disabled={!profile.vatRegistered} onChange={(e) => setDoc((d) => ({ ...d, chargeVat: e.target.checked  }))} />
                   Charge VAT{profile.vatRegistered ? ` at ${profile.vatPercent}%` : " (switch it on in company setup)"}
                 </label>
+                {clients.length > 0 && (
+                  <Label className="space-y-1 sm:col-span-2">Saved client
+                    <select className="h-9 w-full rounded-md border bg-background px-2 text-sm" defaultValue="" onChange={(e) => {
+                      const client = clients.find((item) => item.id === e.target.value);
+                      if (client) setDoc((current) => ({ ...current, clientName: client.name, clientEmail: client.email ?? "", clientPhone: client.phone ?? "" }));
+                    }}>
+                      <option value="">Type a new client</option>
+                      {clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
+                    </select>
+                  </Label>
+                )}
                 <Label className="space-y-1">Client name<Input value={doc.clientName} onChange={(e) => setDoc((d) => ({ ...d, clientName: e.target.value  }))} required /></Label>
                 <Label className="space-y-1">Client company<Input value={doc.clientCompany} onChange={(e) => setDoc((d) => ({ ...d, clientCompany: e.target.value  }))} /></Label>
                 <Label className="space-y-1">Client email<Input value={doc.clientEmail} onChange={(e) => setDoc((d) => ({ ...d, clientEmail: e.target.value  }))} /></Label>

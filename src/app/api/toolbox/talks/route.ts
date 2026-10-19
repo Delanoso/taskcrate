@@ -25,9 +25,12 @@ export async function GET() {
   return NextResponse.json({ talks });
 }
 
+const dateField = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal(""));
+
 const librarySchema = z.object({
   librarySlug: z.string().min(1),
   weekLabel: z.string().trim().min(1, "Enter a week label."),
+  scheduledOn: dateField,
 });
 
 const customSchema = z.object({
@@ -35,6 +38,7 @@ const customSchema = z.object({
   weekLabel: z.string().trim().min(1, "Enter a week label."),
   content: z.string().trim(),
   mediaUrl: z.union([z.string().url("Video / media link must be a full URL."), z.literal("")]).optional(),
+  scheduledOn: dateField,
 });
 
 export async function POST(req: Request) {
@@ -57,6 +61,7 @@ export async function POST(req: Request) {
         organizationId: session.organizationId,
         title: lib.title,
         weekLabel: body.weekLabel,
+        scheduledOn: body.scheduledOn || null,
         content: talkToPlainText(lib),
         librarySlug: lib.slug,
       };
@@ -67,6 +72,7 @@ export async function POST(req: Request) {
         weekLabel: fd.get("weekLabel") ?? "",
         content: fd.get("content") ?? "",
         mediaUrl: fd.get("mediaUrl") ?? "",
+        scheduledOn: fd.get("scheduledOn") ?? "",
       });
       const file = fd.get("file");
       const hasFile = file instanceof File && file.size > 0;
@@ -80,6 +86,7 @@ export async function POST(req: Request) {
         organizationId: session.organizationId,
         title: body.title,
         weekLabel: body.weekLabel,
+        scheduledOn: body.scheduledOn || null,
         content: body.content,
         mediaUrl: body.mediaUrl || null,
       };

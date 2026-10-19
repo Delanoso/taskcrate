@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PersonPicker } from "@/components/modules/person-picker";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, StatusBadge, jsonFetch } from "@/components/modules/ui-bits";
 import { PAYROLL_COLUMNS, parsePayrollRows, textToRows, type PayrollImportRow } from "@/lib/modules/payroll-import";
 import { TAX_YEAR_LABEL, dobFromSaId, formatRand } from "@/lib/modules/payroll-tax";
@@ -278,6 +279,7 @@ export function PayrollAdmin() {
             </CardHeader>
             <CardContent>
               <form onSubmit={savePerson} className="grid gap-3 sm:grid-cols-2">
+                <PersonPicker onPick={(picked) => setPerson((current) => ({ ...current, fullName: picked.fullName, employeeNumber: picked.employeeNumber ?? current.employeeNumber, jobTitle: picked.jobTitle ?? current.jobTitle, idNumber: picked.idNumber ?? current.idNumber, email: picked.email ?? current.email, phone: picked.phone ?? current.phone }))} />
                 <Label className="space-y-1 sm:col-span-2">Full name<Input value={person.fullName} onChange={(e) => setPerson((p) => ({ ...p, fullName: e.target.value  }))} required /></Label>
                 <Label className="space-y-1">Employee number<Input value={person.employeeNumber} onChange={(e) => setPerson((p) => ({ ...p, employeeNumber: e.target.value  }))} /></Label>
                 <Label className="space-y-1">Job title<Input value={person.jobTitle} onChange={(e) => setPerson((p) => ({ ...p, jobTitle: e.target.value  }))} /></Label>
@@ -387,6 +389,10 @@ export function PayrollAdmin() {
                 <>
                   <Button size="sm" variant="outline" asChild><a href={`/api/modules/payroll/pack?period=${period}`}>EMP201 figures</a></Button>
                   <Button size="sm" variant="outline" asChild><a href={`/api/modules/payroll/export?scope=bank&period=${period}`}>Bank file</a></Button>
+                  <Button size="sm" variant="outline" asChild><a href={`/api/modules/payroll/export?scope=fnb&period=${period}`}>FNB</a></Button>
+                  <Button size="sm" variant="outline" asChild><a href={`/api/modules/payroll/export?scope=standard&period=${period}`}>Standard Bank</a></Button>
+                  <Button size="sm" variant="outline" asChild><a href={`/api/modules/payroll/export?scope=absa&period=${period}`}>ABSA</a></Button>
+                  <Button size="sm" variant="outline" asChild><a href={`/api/modules/payroll/irp5?year=${Number(period.slice(0, 4)) + (Number(period.slice(5, 7)) >= 3 ? 1 : 0)}`}>IRP5 figures</a></Button>
                 </>
               )}
             </div>

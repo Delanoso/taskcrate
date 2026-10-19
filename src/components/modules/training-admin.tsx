@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PhotoInput } from "@/components/modules/photo-input";
+import { PersonPicker } from "@/components/modules/person-picker";
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, StatusBadge, jsonFetch } from "@/components/modules/ui-bits";
 import { TRAINING_COLUMNS, parseTrainingRows, textToRows, type TrainingImportRow } from "@/lib/modules/training-import";
 import { TICKET_TYPES } from "@/lib/modules/training-shared";
@@ -139,6 +140,7 @@ export function TrainingAdmin() {
           </CardHeader>
           <CardContent>
             <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
+              <PersonPicker onPick={(picked) => setForm((current) => ({ ...current, fullName: picked.fullName, employeeNumber: picked.employeeNumber ?? current.employeeNumber }))} />
               <Label className="space-y-1 sm:col-span-2">Full name<Input value={form.fullName} onChange={(e) => set("fullName", e.target.value)} required /></Label>
               <Label className="space-y-1">Employee number<Input value={form.employeeNumber} onChange={(e) => set("employeeNumber", e.target.value)} /></Label>
               <Label className="space-y-1">Ticket

@@ -97,12 +97,15 @@ model Organization {
   billingProfile    BillingProfile?
   billingTemplates  BillingTemplate[]
   billingDocuments  BillingDocument[]
+  billingClients    BillingClient[]
   payrollProfile    PayrollProfile?
   payrollEmployees  PayrollEmployee[]
   payrollRuns       PayrollRun[]
   attendanceSites   AttendanceSite[]
   accidentReports   AccidentReport[]
   trainingTickets   TrainingTicket[]
+  people            Person[]
+  supplierBills     SupplierBill[]
 }
 
 model OrganizationBranding {
@@ -341,6 +344,8 @@ model ToolboxTalk {
   attachmentType String?
   publicToken    String              @unique @default(cuid())
   status         String              @default("open")
+  /// YYYY-MM-DD. The morning email chases a talk on this date if nobody has signed.
+  scheduledOn    String?
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
   attendances    ToolboxAttendance[]
@@ -1543,6 +1548,52 @@ model TrainingTicket {
   note              String?
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
+
+  @@index([organizationId])
+}
+
+// ——— Staff list. Each app still stores its own copy of the name. ———
+model Person {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  fullName       String
+  employeeNumber String?
+  phone          String?
+  email          String?
+  idNumber       String?
+  jobTitle       String?
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
+}
+
+model BillingClient {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  email          String?
+  phone          String?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
+}
+
+model SupplierBill {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  supplierName   String
+  reference      String?
+  amountCents    Int
+  dueOn          String
+  status         String       @default("open")
+  photoUrl       String?
+  note           String?
+  paidOn         String?
+  createdAt      DateTime     @default(now())
 
   @@index([organizationId])
 }

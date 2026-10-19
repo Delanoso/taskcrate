@@ -16,7 +16,7 @@ Each organization's data is logically separated. You are responsible for managin
 4. Trial and payments
 A new company may receive one 7-day trial of every App. No card is required for the trial. A second registration with the same email, cellphone number, or company name does not receive another trial.
 
-Each App rents for R1 000 per month. You pay by card through PayFast. The first payment covers the days left in the current month, including the day of payment, and sets up one monthly debit order for the Apps you chose. After that, the debit order runs on the 1st of each month. An invoice for every payment is on the Billing page.
+Each App rents for R1 000 per month on its own. Where two Apps are built to work together, each is R800 per month when both are on the same payment or one is already open and you add the other. You pay by card through PayFast. The first payment covers the days left in the current month, including the day of payment, and sets up one monthly debit order for the Apps you chose. After that, the debit order runs on the 1st of each month. An invoice for every payment is on the Billing page.
 
 You can cancel a debit order or change the card at any time on the Billing page. Cancelling stops future debits; the Apps stay open until the end of the month already paid for. If a monthly debit fails, the Apps stay open for 3 more days, then close until paid. Fees are non-refundable except where required by law.
 

@@ -58,6 +58,7 @@ export function ToolboxAdmin({ orgSlug }: { orgSlug: string }) {
   const [query, setQuery] = useState("");
   const [previewSlug, setPreviewSlug] = useState<string | null>(null);
   const [weekLabel, setWeekLabel] = useState(currentWeekLabel);
+  const [scheduledOn, setScheduledOn] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const appUrl = typeof window !== "undefined" ? window.location.origin : "";
@@ -109,7 +110,7 @@ export function ToolboxAdmin({ orgSlug }: { orgSlug: string }) {
     const res = await fetch("/api/toolbox/talks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ librarySlug: preview.slug, weekLabel }),
+      body: JSON.stringify({ librarySlug: preview.slug, weekLabel, scheduledOn }),
     });
     if (await afterCreate(res)) setPreviewSlug(null);
   }
@@ -175,6 +176,9 @@ export function ToolboxAdmin({ orgSlug }: { orgSlug: string }) {
         value={weekLabel}
         onChange={(e) => setWeekLabel(e.target.value)}
       />
+      <Label htmlFor="scheduledOn">Date of the talk</Label>
+      <Input id="scheduledOn" name="scheduledOn" type="date" value={scheduledOn} onChange={(e) => setScheduledOn(e.target.value)} />
+      <p className="text-xs text-muted-foreground">If nobody has signed by this date, it is on the morning email.</p>
     </div>
   );
 

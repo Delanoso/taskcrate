@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { rentIsOpen } from "@/lib/billing";
 import { createCheckout, validApps } from "@/lib/payments";
 import { isPlatformAdmin } from "@/lib/platform-admin";
 import { isCompanyAdmin } from "@/lib/rbac";
@@ -52,6 +53,8 @@ export async function POST(req: Request) {
   }
   if (body.sandbox && !platformAdmin) return NextResponse.json({ error: "Test payments are for the platform owner only." }, { status: 403 });
 
+  const openSubs = await db.subscription.findMany({ where: { organizationId: org.id } });
+  const owned = openSubs.filter(rentIsOpen).map((sub) => sub.productSlug);
   const covered = await db.debitOrder.findMany({ where: { organizationId: org.id, status: "active" }, select: { appsJson: true } });
   const already = new Set(covered.flatMap((d) => JSON.parse(d.appsJson) as string[]));
   const dup = apps.filter((s) => already.has(s));
@@ -65,6 +68,7 @@ export async function POST(req: Request) {
     companyName: org.name,
     createdBy: user.fullName,
     sandbox: body.sandbox,
+    owned,
   });
   if ("error" in r) return NextResponse.json({ error: r.error }, { status: 503 });
   return NextResponse.json({ ok: true, mode: "payfast", payfastHtml: r.html, reference: r.intent.reference, today: r.quote.today, monthly: r.quote.monthly });

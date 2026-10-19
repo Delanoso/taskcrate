@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { partnersOf, PAIR_ZAR } from "@/data/links";
 import { getProduct, PRODUCTS, formatRentLabel } from "@/data/products";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -50,7 +51,7 @@ export default async function ProductDetailPage({
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
       <p className="text-sm text-muted-foreground">
         Register for a 7-day trial of every app, or rent one when you are ready. First payment covers the
-        days left this month, then R1 000 on the 1st.
+        days left this month, then R1 000 on the 1st. Two apps that work together are R800 each.
       </p>
       <div className="mt-6 grid gap-10 lg:grid-cols-[1fr_340px_360px]">
         <div>
@@ -70,7 +71,18 @@ export default async function ProductDetailPage({
               </li>
             ))}
           </ul>
-          <p className="mt-8 text-sm font-medium">{formatRentLabel()}</p>
+          <p className="mt-8 text-sm font-medium">{formatRentLabel()} on its own. R{PAIR_ZAR.toLocaleString("en-ZA")}/mo each with a linked app.</p>
+          {partnersOf(product.slug).length > 0 && (
+            <div className="mt-4 space-y-2">
+              <h2 className="text-sm font-medium tracking-wide uppercase">Works with</h2>
+              {partnersOf(product.slug).map((partner) => (
+                <p key={partner.slug} className="text-sm">
+                  <Link href={`/products/${partner.slug}`} className="font-medium underline">{partner.name}</Link>
+                  <span className="text-muted-foreground"> — {partner.because} Pay for both and each is R{PAIR_ZAR.toLocaleString("en-ZA")} a month.</span>
+                </p>
+              ))}
+            </div>
+          )}
           <div className="mt-4 flex flex-wrap gap-2">
             {product.hasPdfExport && <Badge variant="outline">Branded PDFs</Badge>}
             {product.hasSignatures && <Badge variant="outline">Signatures</Badge>}

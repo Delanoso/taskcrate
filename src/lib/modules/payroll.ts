@@ -5,6 +5,7 @@ import { parsePayrollRows, type PayrollImportRow } from "@/lib/modules/payroll-i
 import { calculatePayslip, dobFromSaId, formatRand, payDateFor, randsToCents } from "@/lib/modules/payroll-tax";
 import { aodDeductionsFor, matchDeductions, recordPayrollDeductions, reversePayrollDeductions } from "@/lib/modules/aod-payroll";
 import { attendanceHoursForPeriod, type ClockBucket } from "@/lib/modules/attendance-hours";
+import { rememberPerson } from "@/lib/modules/people";
 
 export class PayrollError extends Error {}
 
@@ -135,12 +136,16 @@ export async function savePayrollEmployee(organizationId: string, raw: unknown) 
   if (parsed.data.monthlySalary <= 0) throw new PayrollError("Monthly salary must be greater than 0");
   const data = employeeData(parsed.data, parsed.data.active ?? true);
   await assertUniqueNumber(organizationId, data.employeeNumber, parsed.data.id);
+  let saved;
   if (parsed.data.id) {
     const existing = await db.payrollEmployee.findFirst({ where: { id: parsed.data.id, organizationId } });
     if (!existing) throw new PayrollError("Employee not found");
-    return db.payrollEmployee.update({ where: { id: existing.id }, data });
+    saved = await db.payrollEmployee.update({ where: { id: existing.id }, data });
+  } else {
+    saved = await db.payrollEmployee.create({ data: { organizationId, ...data, active: true } });
   }
-  return db.payrollEmployee.create({ data: { organizationId, ...data, active: true } });
+  await rememberPerson(organizationId, data);
+  return saved;
 }
 
 export async function importPayrollEmployees(organizationId: string, rows: unknown[]) {

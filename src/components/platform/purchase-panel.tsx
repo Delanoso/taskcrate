@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { formatRentLabel, RENT_ZAR } from "@/data/products";
+import { PAIR_ZAR, basketTotals, partnersOf } from "@/data/links";
+import { RENT_ZAR } from "@/data/products";
 import { monthQuote } from "@/lib/pricing";
 
 export function PurchasePanel({ productSlug }: { productSlug: string }) {
@@ -16,6 +17,8 @@ export function PurchasePanel({ productSlug }: { productSlug: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [accepted, setAccepted] = useState(false);
+  const [extras, setExtras] = useState<string[]>([]);
+  const partners = partnersOf(productSlug);
   const [form, setForm] = useState({
     email: "",
     fullName: "",
@@ -34,7 +37,7 @@ export function PurchasePanel({ productSlug }: { productSlug: string }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          productSlug,
+          apps: [productSlug, ...extras],
           guest: true,
           email: form.email,
           fullName: form.fullName,
@@ -66,20 +69,23 @@ export function PurchasePanel({ productSlug }: { productSlug: string }) {
     }
   }
 
-  const quote = monthQuote();
+  const base = monthQuote();
+  const quote = basketTotals([productSlug, ...extras], [], base.daysLeft, base.daysInMonth);
+  const linked = extras.length > 0;
 
   return (
     <Card id="purchase">
       <CardHeader>
         <CardTitle>Rent this app</CardTitle>
         <CardDescription>
-          R{quote.amount.toFixed(2)} today for the {quote.daysLeft} day{quote.daysLeft === 1 ? "" : "s"} left
-          this month, then R{RENT_ZAR.toLocaleString("en-ZA")} on the 1st of every month.
+          R{quote.today.toFixed(2)} today for the {base.daysLeft} day{base.daysLeft === 1 ? "" : "s"} left
+          this month, then R{quote.monthly.toLocaleString("en-ZA")} on the 1st of every month.
+          {linked ? ` Both apps are R${PAIR_ZAR.toLocaleString("en-ZA")} because they work together.` : ` On its own this app is R${RENT_ZAR.toLocaleString("en-ZA")}.`}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          {formatRentLabel()} after the first partial month. Cancel anytime. Or{" "}
+          Cancel anytime. Or{" "}
           <Link href="/register" className="underline">
             register for a 7-day trial of every app
           </Link>{" "}
@@ -113,6 +119,25 @@ export function PurchasePanel({ productSlug }: { productSlug: string }) {
             required
           />
         </div>
+        {partners.length > 0 && (
+          <div className="space-y-2 rounded-md border p-3">
+            <p className="text-sm font-medium">Add a linked app and both are R{PAIR_ZAR.toLocaleString("en-ZA")} a month</p>
+            {partners.map((partner) => (
+              <label key={partner.slug} className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={extras.includes(partner.slug)}
+                  onChange={() => setExtras((current) => current.includes(partner.slug) ? current.filter((slug) => slug !== partner.slug) : [...current, partner.slug])}
+                />
+                <span>
+                  <span className="font-medium">{partner.name}</span>
+                  <span className="block text-muted-foreground">{partner.because}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
         <div className="flex items-start gap-3 rounded-md border p-3">
           <Checkbox
             id="rent-terms"
@@ -132,7 +157,7 @@ export function PurchasePanel({ productSlug }: { productSlug: string }) {
           </Label>
         </div>
         <Button className="w-full" onClick={checkout} disabled={loading || !accepted}>
-          {loading ? "Redirecting to payment…" : `Pay R${quote.amount.toFixed(2)} today`}
+          {loading ? "Redirecting to payment…" : `Pay R${quote.today.toFixed(2)} today`}
         </Button>
         <p className="text-xs text-muted-foreground">
           Card payment through PayFast, then a monthly debit order you can cancel any time. When the

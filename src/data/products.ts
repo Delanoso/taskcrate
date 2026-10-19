@@ -20,7 +20,7 @@ export type ProductDefinition = {
 
 /**
  * Full TaskCrate catalog. Each app states the problem it solves.
- * All apps rent for R1,000/mo.
+ * Each app rents for R1,000/mo on its own. A linked pair is R800 each.
  */
 export const PRODUCTS: ProductDefinition[] = [
   // —— Health & Safety ——
@@ -38,6 +38,7 @@ export const PRODUCTS: ProductDefinition[] = [
       "Manager approve & close workflow",
       "Auto compliance PDF",
       "WhatsApp contractor links",
+      "An expired training ticket or a failed fit-for-duty check blocks the permit when those apps are open",
     ],
     hasPdfExport: true,
     hasSignatures: true,
@@ -57,6 +58,7 @@ export const PRODUCTS: ProductDefinition[] = [
       "Digital on-screen signatures",
       "Completion tracking dashboard",
       "Branded signed register PDF",
+      "A date on the talk, and a morning email if nobody has signed",
     ],
     hasPdfExport: true,
     hasSignatures: true,
@@ -134,6 +136,7 @@ export const PRODUCTS: ProductDefinition[] = [
       "Photo evidence per question",
       "Compliance % and findings list",
       "Audit report PDF",
+      "On the 7th, a morning email if no audit was completed that month",
     ],
     hasPdfExport: true,
     hasSignatures: true,
@@ -153,6 +156,8 @@ export const PRODUCTS: ProductDefinition[] = [
       "Injury, treatment, and photos",
       "Signatures of the reporter, the injured person, and a witness",
       "PDF of the report and Excel of the register",
+      "Investigation notes and a COIDA fact pack",
+      "Opens a near miss, a discipline note, or an AOD when those apps are open",
     ],
     hasPdfExport: true,
     hasSignatures: true,
@@ -306,14 +311,15 @@ export const PRODUCTS: ProductDefinition[] = [
     tagline: "PAYE, UIF, and the payslip, worked out from the people you already loaded.",
     solves: "Tax and UIF are calculated in a spreadsheet every month. A payslip is typed by hand, and a new employee means starting the sums again.",
     description:
-      "Save the PAYE, UIF and levy details, then load each person or bring the whole list in from Excel. Each month the run works out PAYE, UIF and the levy from the SARS tables. Download a payslip PDF, or Excel of the people and every pay run.",
+      "Save the PAYE, UIF and levy details, then load each person or bring the whole list in from Excel. Each month the run works out PAYE, UIF, the levy, and overtime from clocked hours. Download a payslip, the EMP201 figures, a bank file, and the annual IRP5 pack. TaskCrate does not submit the return to SARS.",
     category: "HR & Workforce",
     priceMonthlyZar: 1000,
     features: [
       "PAYE, UIF and SDL saved once",
       "Add people one by one or from Excel",
       "Tax, UIF and the medical credit worked out each month",
-      "Payslip PDF",
+      "Payslip PDF, EMP201 figures, and an annual IRP5 pack",
+      "Bank files for FNB, Standard Bank and ABSA",
       "Excel of the people and of every pay run",
     ],
     hasPdfExport: true,
@@ -326,7 +332,7 @@ export const PRODUCTS: ProductDefinition[] = [
     tagline: "See which tickets expire before the site turns the person away.",
     solves: "A forklift licence or a first aid certificate expires. Nobody notices until the client or the site stops that person from working.",
     description:
-      "Keep each person's forklift licence, first aid certificate, driving permit, and the other tickets the site asks for. Store the photo of the card, the certificate number, and the expiry. Tickets due in the next 30 days stay on the list. Load people one by one or from Excel, and download the matrix as Excel.",
+      "Keep each person's forklift licence, first aid certificate, driving permit, and the other tickets the site asks for. Store the photo of the card, the certificate number, and the expiry. Tickets due in the next 30 days stay on the list, and the morning email names anyone whose ticket is already expired. When Site Attendance or Permit to Work is also open, an expired ticket stops that person clocking in or getting a permit until a supervisor writes a reason. Load people one by one or from Excel, and download the matrix as Excel.",
     category: "HR & Workforce",
     priceMonthlyZar: 1000,
     features: [
@@ -470,6 +476,7 @@ export const PRODUCTS: ProductDefinition[] = [
       "PPE checks and reaction test",
       "Time of the check",
       "Excel register of every result",
+      "A failed check blocks clock-in and permits the same day when those apps are open",
     ],
     hasPdfExport: true,
     hasSignatures: true,
@@ -489,6 +496,8 @@ export const PRODUCTS: ProductDefinition[] = [
       "Name, photo, and signature",
       "Time saved when it is sent",
       "Who is still on site, and an Excel register",
+      "Clocked hours and overtime go onto the payslip when Payroll is open",
+      "An expired ticket or a failed fit check blocks clock-in when those apps are open",
     ],
     hasPdfExport: false,
     hasSignatures: true,
@@ -509,8 +518,29 @@ export const PRODUCTS: ProductDefinition[] = [
       "Choose the currency on each document",
       "PDF of the quote or invoice",
       "Mark invoices paid or unpaid, and download the book as Excel",
+      "Clients are saved and reused",
+      "Unpaid quotes and invoices come back in the morning email",
     ],
     hasPdfExport: true,
+    hasSignatures: false,
+    hasDateReminders: true,
+  },
+  {
+    slug: "bills-to-pay",
+    name: "Bills to Pay",
+    tagline: "Supplier invoices with a due date, and an email when they are still open.",
+    solves: "Supplier invoices sit in an email or a photo on a phone. The due date passes, and the first reminder is the supplier phoning.",
+    description:
+      "Photograph the invoice, name the supplier, and set the due date. Open bills come back in the morning email until someone marks them paid. It works on its own. With Quotations, money in and money out sit next to each other.",
+    category: "Operations & Admin",
+    priceMonthlyZar: 1000,
+    features: [
+      "Supplier, amount, reference and due date",
+      "Photo of the invoice",
+      "Mark paid, or leave it open",
+      "Morning email while a bill is overdue",
+    ],
+    hasPdfExport: false,
     hasSignatures: false,
     hasDateReminders: true,
   },

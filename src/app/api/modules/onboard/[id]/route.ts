@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import type { Prisma } from "@/generated/prisma/client";
 import { companyHasApp } from "@/lib/billing";
+import { rememberPerson } from "@/lib/modules/people";
 import { db } from "@/lib/db";
 import { requireProductApi } from "@/lib/modules/api-guard";
 import { managersOnly, notFound, parseBody, removeUpload, staffName } from "@/lib/modules/common";
@@ -76,6 +77,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         },
       });
       data.leaveEmployeeId = emp.id;
+      await rememberPerson(orgId, { fullName: emp.fullName, employeeNumber: emp.employeeNumber, phone: emp.phone });
     }
   } else {
     if (p.status !== "approved" && p.status !== "changes_requested") return NextResponse.json({ error: "Nothing to reopen." }, { status: 409 });

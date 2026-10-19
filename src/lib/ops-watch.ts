@@ -13,7 +13,7 @@ function add(items: Item[], org: string, slug: string, text: string) {
 }
 
 /** One morning email per company for work that is sitting unfinished. */
-export async function sendOpsWatch(now = new Date()) {
+export async function collectWatchItems(now = new Date()) {
   const today = saToday();
   const todayStart = new Date(`${today}T00:00:00+02:00`);
   const yesterday = new Date(todayStart.getTime() - DAY);
@@ -78,7 +78,7 @@ export async function sendOpsWatch(now = new Date()) {
   }
 
   const talks = await db.toolboxTalk.findMany({
-    where: { status: "open", createdAt: { lt: twoDays }, attendances: { none: {} } },
+    where: { status: "open", scheduledOn: null, createdAt: { lt: twoDays }, attendances: { none: {} } },
   });
   for (const talk of talks) {
     add(items, talk.organizationId, "toolbox-talks", `“${talk.title}” has been open for two days with no signatures.`);
@@ -128,6 +128,46 @@ export async function sendOpsWatch(now = new Date()) {
     add(items, pack.organizationId, "onboard-docs", `${pack.employeeName}'s onboarding pack is waiting for a review.`);
   }
 
+  const dayOfMonth = Number(today.slice(8, 10));
+  if (dayOfMonth === 7) {
+    const monthStart = new Date(`${today.slice(0, 7)}-01T00:00:00+02:00`);
+    const finished = await db.ohsaAudit.findMany({ where: { status: "completed", completedAt: { gte: monthStart } }, select: { organizationId: true } });
+    const done = new Set(finished.map((audit) => audit.organizationId));
+    const subscribers = await db.subscription.findMany({ where: { productSlug: "ohsa-mock-auditor", status: "active" } });
+    for (const sub of subscribers) {
+      if (!done.has(sub.organizationId)) add(items, sub.organizationId, "ohsa-mock-auditor", "No OHSA audit has been completed this month.");
+    }
+  }
+
+  const bills = await db.supplierBill.findMany({ where: { status: "open", dueOn: { lt: today } } });
+  for (const bill of bills) {
+    add(items, bill.organizationId, "bills-to-pay", `${bill.supplierName} for R ${(bill.amountCents / 100).toFixed(2)} was due ${bill.dueOn}.`);
+  }
+
+  const documents = await db.billingDocument.findMany({
+    where: { OR: [{ kind: "QUOTE", status: "SENT" }, { kind: "INVOICE", status: { notIn: ["PAID", "VOID", "DRAFT"] } }], dueDate: { lt: today } },
+  });
+  for (const doc of documents) {
+    add(items, doc.organizationId, "quotations", `${doc.number} for ${doc.clientName} is still open past ${doc.dueDate}.`);
+  }
+
+  const talksDated = await db.toolboxTalk.findMany({
+    where: { status: "open", scheduledOn: { lte: today }, attendances: { none: {} } },
+  });
+  for (const talk of talksDated) {
+    add(items, talk.organizationId, "toolbox-talks", `“${talk.title}” was scheduled for ${talk.scheduledOn} and has no signatures.`);
+  }
+
+  return items;
+}
+
+export async function watchForCompany(organizationId: string) {
+  return (await collectWatchItems()).filter((item) => item.org === organizationId);
+}
+
+/** One morning email per company for work that is sitting unfinished. */
+export async function sendOpsWatch(now = new Date()) {
+  const items = await collectWatchItems(now);
   const byOrg = new Map<string, Map<string, string[]>>();
   for (const item of items) {
     const slugs = byOrg.get(item.org) ?? new Map<string, string[]>();

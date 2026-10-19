@@ -124,6 +124,30 @@ export async function GET(req: Request) {
     return xlsxResponse(bytes, `Bank file ${period}`);
   }
 
+  if (scope === "fnb" || scope === "standard" || scope === "absa") {
+    const period = new URL(req.url).searchParams.get("period") ?? "";
+    if (!/^\d{4}-\d{2}$/.test(period)) return new Response("Choose a month.", { status: 400 });
+    const run = await db.payrollRun.findUnique({
+      where: { organizationId_period: { organizationId: org, period } },
+      include: { lines: { orderBy: { fullName: "asc" } } },
+    });
+    if (!run) return new Response("Calculate this month first.", { status: 404 });
+    const headers = scope === "fnb"
+      ? ["RecName", "RecAccount", "BranchCode", "Amount", "OwnRef", "RecRef"]
+      : scope === "standard"
+        ? ["Name", "Account Number", "Branch Code", "Amount", "Statement Reference"]
+        : ["Account holder", "Account number", "Branch code", "Amount", "Reference"];
+    const rows = run.lines.map((line) => {
+      const amount = (line.netCents / 100).toFixed(2);
+      const reference = `Pay ${period}`;
+      if (scope === "fnb") return [line.fullName, line.accountNumber ?? "", line.branchCode ?? "", amount, reference, reference];
+      return [line.fullName, line.accountNumber ?? "", line.branchCode ?? "", amount, reference];
+    });
+    const bytes = buildXlsx({ sheetName: "Payment", headers, rows, widths: headers.map(() => 22) });
+    const label = scope === "fnb" ? "FNB" : scope === "standard" ? "Standard Bank" : "ABSA";
+    return xlsxResponse(bytes, `${label} ${period}`);
+  }
+
   const employees = await db.payrollEmployee.findMany({ where: { organizationId: org }, orderBy: { fullName: "asc" } });
   const rows = employees.map((employee) => [
     employee.fullName,

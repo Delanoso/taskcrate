@@ -245,6 +245,16 @@ const SERVER: Record<string, ProductSandbox> = {
     successTitle: "Shift recorded",
     successBody: "Someone still clocked in yesterday is on the morning list.",
   },
+  "bills-to-pay": {
+    screenTitle: "Supplier bill",
+    subtitle: "Accounts",
+    steps: [
+      { id: "photo", label: "Photograph the invoice" },
+      { id: "due", label: "Set the due date" },
+    ],
+    successTitle: "Bill on the list",
+    successBody: "It stays on the morning email until it is marked paid.",
+  },
   quotations: {
     screenTitle: "Quotation",
     subtitle: "Client link",

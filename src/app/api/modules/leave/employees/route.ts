@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireProductApi } from "@/lib/modules/api-guard";
 import { employeeData, employeeInput } from "@/lib/modules/leave-employee-schema";
+import { rememberPerson } from "@/lib/modules/people";
 
 const SLUG = "leave-planner";
 
@@ -12,9 +13,11 @@ export async function POST(req: Request) {
   if ("error" in gate) return gate.error;
   const parsed = employeeInput.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid" }, { status: 400 });
+  const fields = employeeData(parsed.data);
   const employee = await db.leaveEmployee.create({
-    data: { organizationId: gate.session.organizationId, ...employeeData(parsed.data) },
+    data: { organizationId: gate.session.organizationId, ...fields },
   });
+  await rememberPerson(gate.session.organizationId, fields);
   return NextResponse.json({ employee });
 }
 

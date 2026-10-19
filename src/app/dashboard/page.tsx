@@ -6,6 +6,7 @@ import { PRODUCTS } from "@/data/products";
 import { formatRentDate } from "@/lib/billing";
 import { requireDashboardContext } from "@/lib/dashboard-context";
 import { canAccessProduct, canAddApps } from "@/lib/rbac";
+import { watchForCompany } from "@/lib/ops-watch";
 
 export default async function DashboardPage({
   searchParams,
@@ -16,6 +17,7 @@ export default async function DashboardPage({
   const sp = await searchParams;
 
   const accessible = PRODUCTS.filter((p) => canAccessProduct(access, p.slug));
+  const waiting = await watchForCompany(org.id);
   const availableToBuy = PRODUCTS.filter((p) => access.subscribedSlugs.includes(p.slug));
   const admin = canAddApps(access.role);
 
@@ -67,6 +69,18 @@ export default async function DashboardPage({
             </>
           ) : null}
         </div>
+      )}
+
+      {waiting.length > 0 && (
+        <section className="mt-8">
+          <h2 className="text-lg font-medium">Needs you</h2>
+          <p className="mt-1 text-sm text-muted-foreground">The same list that goes out in the morning email.</p>
+          <ul className="mt-3 space-y-2">
+            {waiting.slice(0, 20).map((item) => (
+              <li key={`${item.slug}-${item.text}`} className="rounded-lg border bg-card px-4 py-3 text-sm">{item.text}</li>
+            ))}
+          </ul>
+        </section>
       )}
 
       <section className="mt-10">

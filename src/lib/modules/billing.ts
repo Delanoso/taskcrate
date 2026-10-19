@@ -127,10 +127,11 @@ function toDocument(row: {
 }
 
 export async function billingSnapshot(organizationId: string) {
-  const [profile, custom, documents] = await Promise.all([
+  const [profile, custom, documents, clients] = await Promise.all([
     db.billingProfile.findUnique({ where: { organizationId } }),
     db.billingTemplate.findMany({ where: { organizationId }, orderBy: { name: "asc" } }),
     db.billingDocument.findMany({ where: { organizationId }, orderBy: { createdAt: "desc" } }),
+    db.billingClient.findMany({ where: { organizationId }, orderBy: { name: "asc" } }),
   ]);
   const invoiceByQuote = new Map(
     documents.filter((doc) => doc.sourceQuoteId).map((doc) => [doc.sourceQuoteId!, doc]),
@@ -148,6 +149,7 @@ export async function billingSnapshot(organizationId: string) {
         lines: viewLines(template.linesJson),
       })),
     ],
+    clients: clients.map((client) => ({ id: client.id, name: client.name, email: client.email, phone: client.phone })),
     documents: documents.map((doc) => ({
       ...toDocument(doc),
       invoiceNumber: doc.kind === "QUOTE" ? invoiceByQuote.get(doc.id)?.number ?? null : null,
@@ -223,6 +225,17 @@ export async function deleteBillingTemplate(organizationId: string, id: string) 
   await db.billingTemplate.delete({ where: { id } });
 }
 
+async function rememberClient(organizationId: string, input: { name: string; email: string | null; phone: string | null }) {
+  const name = input.name.trim();
+  if (name.length < 2) return;
+  const existing = await db.billingClient.findFirst({ where: { organizationId, name } });
+  if (existing) {
+    await db.billingClient.update({ where: { id: existing.id }, data: { email: input.email ?? existing.email, phone: input.phone ?? existing.phone } });
+    return;
+  }
+  await db.billingClient.create({ data: { organizationId, name, email: input.email, phone: input.phone } });
+}
+
 export async function saveBillingDocument(organizationId: string, raw: unknown) {
   const profile = await db.billingProfile.findUnique({ where: { organizationId } });
   if (!profile) throw new BillingError("Save the company details first");
@@ -256,6 +269,7 @@ export async function saveBillingDocument(organizationId: string, raw: unknown) 
     linesJson: JSON.stringify(storedLines(data.lines)),
     ...totals,
   };
+  await rememberClient(organizationId, { name: data.clientName, email: emptyToNull(data.clientEmail), phone: emptyToNull(data.clientPhone) });
   if (data.id) {
     const existing = await db.billingDocument.findFirst({ where: { id: data.id, organizationId } });
     if (!existing) throw new BillingError("Document not found");

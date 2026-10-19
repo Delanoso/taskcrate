@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { photoSchema } from "@/lib/modules/common";
 import { parseTrainingRows, type TrainingImportRow } from "@/lib/modules/training-import";
 import { ticketState } from "@/lib/modules/training-shared";
+import { rememberPerson } from "@/lib/modules/people";
 import { saveDataUrlUpload } from "@/lib/uploads";
 
 export class TrainingError extends Error {}
@@ -68,6 +69,7 @@ export async function saveTrainingTicket(organizationId: string, raw: unknown) {
     note: blank(data.note),
     ...(photoUrl ? { photoUrl } : {}),
   };
+  await rememberPerson(organizationId, { fullName: data.fullName, employeeNumber: blank(data.employeeNumber) });
   if (data.id) {
     const existing = await db.trainingTicket.findFirst({ where: { id: data.id, organizationId } });
     if (!existing) throw new TrainingError("Ticket not found");

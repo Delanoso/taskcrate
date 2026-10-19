@@ -115,3 +115,43 @@ export async function buildPayrollPackPdf(organizationId: string, period: string
   doc.paragraph("The bank file lists each person's account and net pay. A person with no account number is marked so the payment is not sent blind.");
   return { bytes: await doc.finish(), fileName: `EMP201 figures ${period}` };
 }
+
+/** Annual figures for the IRP5 certificates and the EMP501. TaskCrate does not submit them. */
+export async function buildIrp5Pdf(organizationId: string, taxYear: number) {
+  const start = `${taxYear - 1}-03`;
+  const end = `${taxYear}-02`;
+  const runs = await db.payrollRun.findMany({
+    where: { organizationId, period: { gte: start, lte: end }, status: "FINALISED" },
+    include: { lines: true },
+  });
+  if (!runs.length) throw new PayrollError("Finalise at least one month in this tax year first");
+  const people = new Map<string, { name: string; idNumber: string; taxNumber: string; gross: number; paye: number; uif: number }>();
+  for (const run of runs) {
+    for (const line of run.lines) {
+      const key = (line.employeeNumber || line.fullName).trim().toLowerCase();
+      const current = people.get(key) ?? { name: line.fullName, idNumber: line.idNumber ?? "", taxNumber: line.taxNumber ?? "", gross: 0, paye: 0, uif: 0 };
+      current.gross += line.grossCents;
+      current.paye += line.payeCents;
+      current.uif += line.uifEmployeeCents;
+      people.set(key, current);
+    }
+  }
+  const [profile, employer] = await Promise.all([
+    db.payrollProfile.findUnique({ where: { organizationId } }),
+    companyName(organizationId),
+  ]);
+  const doc = await createBrandedDocument({ organizationId, title: "Figures for the IRP5 and EMP501", documentNumber: `IRP5-${taxYear}` });
+  doc.heading(employer);
+  doc.field("PAYE reference", profile?.payeNumber);
+  doc.field("Tax year ending", `February ${taxYear}`);
+  doc.paragraph("These are the figures for each person's IRP5 and for the EMP501. TaskCrate does not submit them to SARS. Type them into eFiling yourself.");
+  for (const person of [...people.values()].sort((a, b) => a.name.localeCompare(b.name))) {
+    doc.heading(person.name);
+    doc.field("ID number", person.idNumber);
+    doc.field("Tax number", person.taxNumber);
+    doc.field("Gross pay", formatRand(person.gross));
+    doc.field("PAYE", formatRand(person.paye));
+    doc.field("UIF from the employee", formatRand(person.uif));
+  }
+  return { bytes: await doc.finish(), fileName: `IRP5 figures ${taxYear}` };
+}

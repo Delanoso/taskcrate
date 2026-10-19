@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { APP_PAIRS, PAIR_ZAR } from "@/data/links";
 import { PRODUCTS, RENT_ZAR } from "@/data/products";
 import { GRACE_MS, rentIsOpen } from "@/lib/billing";
 import { requireBillingApi } from "@/lib/billing-guard";
@@ -29,7 +30,19 @@ export async function GET() {
     trialEndsAt: trialOpen ? org!.trialEndsAt!.toISOString() : null,
     trialNote: org?.trialNote ?? null,
     payments: { live: payfastReady(payfastConfig(false)), sandbox: gate.platformAdmin },
-    pricing: { monthly: RENT_ZAR, todayPerApp: quote.today, daysLeft: quote.daysLeft, billingDate: quote.billingDate },
+    pricing: {
+      monthly: RENT_ZAR,
+      pairMonthly: PAIR_ZAR,
+      todayPerApp: quote.today,
+      daysLeft: quote.daysLeft,
+      daysInMonth: quote.daysInMonth,
+      billingDate: quote.billingDate,
+      pairs: APP_PAIRS,
+    },
+    openSlugs: PRODUCTS.map((p) => p.slug).filter((slug) => {
+      const sub = subFor.get(slug);
+      return !!sub && rentIsOpen(sub);
+    }),
     apps: PRODUCTS.map((p) => {
       const s = subFor.get(p.slug);
       const open = !!s && rentIsOpen(s);

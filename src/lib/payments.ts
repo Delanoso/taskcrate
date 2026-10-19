@@ -1,6 +1,7 @@
 import { randomBytes } from "crypto";
 import type { PaymentIntent } from "@/generated/prisma/client";
-import { RENT_ZAR, getProduct } from "@/data/products";
+import { priceOf } from "@/data/links";
+import { getProduct } from "@/data/products";
 import { grantPaidPeriod } from "@/lib/billing";
 import { db } from "@/lib/db";
 import { alertCompany } from "@/lib/email";
@@ -14,10 +15,13 @@ import { provisionWorkspaceFromPayment } from "@/lib/provision";
 export const appOrigin = () => (process.env.NEXT_PUBLIC_APP_URL || "https://taskcrate.co.za").replace(/\/$/, "");
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-/** Today's pro-rata charge and the monthly debit for a basket of apps. */
-export function basketQuote(slugs: string[], now = new Date()) {
+/** Today's pro-rata charge and the monthly debit. A linked pair in the basket, or already open, is R800 each. */
+export function basketQuote(slugs: string[], owned: string[] = [], now = new Date()) {
   const q = monthQuote(now);
-  return { ...q, apps: slugs.length, today: round2(q.amount * slugs.length), monthly: RENT_ZAR * slugs.length };
+  const have = [...slugs, ...owned];
+  const prices = slugs.map((slug) => priceOf(slug, have));
+  const today = round2(prices.reduce((sum, price) => sum + Math.round((price * q.daysLeft * 100) / q.daysInMonth) / 100, 0));
+  return { ...q, apps: slugs.length, today, monthly: prices.reduce((sum, price) => sum + price, 0), prices };
 }
 
 export function validApps(slugs: string[]) {
@@ -34,10 +38,11 @@ export async function createCheckout(input: {
   companyName: string;
   createdBy?: string;
   sandbox?: boolean;
+  owned?: string[];
 }) {
   const cfg = payfastConfig(!!input.sandbox);
   if (!payfastReady(cfg)) return { error: "Card payments are not switched on yet. Please try again later or contact support." } as const;
-  const quote = basketQuote(input.apps);
+  const quote = basketQuote(input.apps, input.owned ?? []);
   if (quote.today < 5) return { error: "PayFast needs a payment of at least R5." } as const;
 
   const intent = await db.paymentIntent.create({

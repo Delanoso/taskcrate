@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, CreditCard, Download, FlaskConical, Info, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { activePairs, basketTotals } from "@/data/links";
+import { getProduct } from "@/data/products";
 
 type App = { slug: string; name: string; category: string; paidUntil: string | null; inGrace: boolean; lapsed: boolean; debitOrderId: string | null };
 type Debit = { id: string; apps: string[]; monthly: number; status: string; sandbox: boolean; createdAt: string; lastPaidAt: string | null; cancelledAt: string | null; cancelledBy: string | null; updateCardUrl: string | null };
@@ -12,7 +14,8 @@ type Data = {
   trialEndsAt: string | null;
   trialNote: string | null;
   payments: { live: boolean; sandbox: boolean };
-  pricing: { monthly: number; todayPerApp: number; daysLeft: number; billingDate: string };
+  pricing: { monthly: number; pairMonthly: number; todayPerApp: number; daysLeft: number; daysInMonth: number; billingDate: string };
+  openSlugs: string[];
   apps: App[];
   debitOrders: Debit[];
   history: Payment[];
@@ -53,8 +56,10 @@ export function BillingManager({ notice, preselect = null }: { notice: "paid" | 
   if (!data) return <p className="mt-6 text-sm text-muted-foreground">Loading billing…</p>;
 
   const payable = data.apps.filter((a) => !a.debitOrderId);
-  const today = Math.round(data.pricing.todayPerApp * picked.length * 100) / 100;
-  const monthly = data.pricing.monthly * picked.length;
+  const totals = basketTotals(picked, data.openSlugs, data.pricing.daysLeft, data.pricing.daysInMonth);
+  const today = totals.today;
+  const monthly = totals.monthly;
+  const linked = activePairs(picked, data.openSlugs);
   const toggle = (slug: string) => setPicked((p) => (p.includes(slug) ? p.filter((s) => s !== slug) : [...p, slug]));
   const categories = [...new Set(data.apps.map((a) => a.category))];
   const recentPaid = data.history.some((p) => openedAt - new Date(p.at).getTime() < 15 * 60_000);
@@ -108,7 +113,7 @@ export function BillingManager({ notice, preselect = null }: { notice: "paid" | 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Apps</h2>
         <p className="text-sm text-muted-foreground">
-          Tick the apps to pay for. Each app is {R(data.pricing.monthly)} a month, debited on the 1st. Today you only pay for the {data.pricing.daysLeft} day{data.pricing.daysLeft === 1 ? "" : "s"} left this month ({R(data.pricing.todayPerApp)} per app).
+          Tick the apps to pay for. An app on its own is {R(data.pricing.monthly)} a month. Two apps that work together are {R(data.pricing.pairMonthly)} each when both are in this payment, or when you already have the other one open. Today you only pay for the {data.pricing.daysLeft} day{data.pricing.daysLeft === 1 ? "" : "s"} left this month.
         </p>
         {categories.map((cat) => (
           <div key={cat} className="space-y-1.5">
@@ -141,6 +146,11 @@ export function BillingManager({ notice, preselect = null }: { notice: "paid" | 
                 <>
                   <p><strong>{picked.length} app{picked.length === 1 ? "" : "s"}</strong> · pay <strong>{R(today)}</strong> today</p>
                   <p className="text-muted-foreground">then {R(monthly)} on the 1st of every month · cancel any time</p>
+                  {linked.length > 0 && (
+                    <p className="text-muted-foreground">
+                      {linked.map((pair) => `${getProduct(pair.a)?.name ?? pair.a} + ${getProduct(pair.b)?.name ?? pair.b}`).join("; ")} at {R(data.pricing.pairMonthly)} each.
+                    </p>
+                  )}
                 </>
               ) : (
                 <p className="text-muted-foreground">Tick the apps you want to pay for.</p>

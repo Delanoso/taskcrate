@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { PhoneSandbox } from "@/components/marketing/phone-sandbox";
 import type { ProductDefinition } from "@/data/products";
+import { PAIR_ZAR } from "@/data/links";
 import { formatRentLabel } from "@/data/products";
 
 export function ProductCard({
@@ -41,7 +42,7 @@ export function ProductCard({
             </li>
           ))}
         </ul>
-        <p className="pt-1 text-sm font-medium">{formatRentLabel()}</p>
+        <p className="pt-1 text-sm font-medium">{formatRentLabel()} alone · R{PAIR_ZAR.toLocaleString("en-ZA")} with a linked app</p>
       </CardContent>
       <CardFooter className="flex-col gap-2 sm:flex-row">
         <Button variant="outline" asChild className="w-full flex-1">
