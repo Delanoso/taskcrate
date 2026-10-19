@@ -90,14 +90,7 @@ export default function Page() {
         {a.instalmentAmount && a.firstPeriod && (
           <p className="mt-3 text-sm">Repaid in <strong>{a.instalments}</strong> monthly instalment{a.instalments === 1 ? "" : "s"} of <strong>{money(a.instalmentAmount)}</strong> by {methodLabel(a.repayMethod).toLowerCase()}, from {periodLabel(a.firstPeriod)}.</p>
         )}
-        {a.photos.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {a.photos.map((p) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img key={p} src={p} alt="Proof" className="size-20 rounded-md border object-cover" />
-            ))}
-          </div>
-        )}
+        {a.photos.length > 0 && <p className="mt-2 text-xs text-muted-foreground">{a.photos.length} photo{a.photos.length === 1 ? "" : "s"} attached as proof (included in your signed copy).</p>}
       </Box>
 
       {a.signedAt ? (

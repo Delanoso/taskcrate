@@ -62,7 +62,7 @@ export async function DashboardShell({
           <Link href="/dashboard" className="font-semibold tracking-tight">TaskCrate</Link>
           <p className="truncate text-xs text-sidebar-foreground/60">{organizationName}</p>
         </div>
-        <nav className="flex gap-1 overflow-x-auto px-3 py-2 text-sm">
+        <nav className="flex gap-1 overflow-x-auto px-3 py-2 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {links.map((l) => (
             <HardLink key={l.href} href={l.href}
               className={cn("shrink-0 rounded-full px-3 py-1.5", l.active ? "bg-sidebar-primary font-medium text-sidebar-primary-foreground" : "bg-sidebar-accent/40 text-sidebar-foreground/80")}>
