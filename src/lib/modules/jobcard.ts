@@ -1,5 +1,6 @@
 import type { JobCard } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { issuePartsForJob, StockError } from "@/lib/modules/stock";
 import { saveDataUrlUpload } from "@/lib/uploads";
 import {
   closeGaps,
@@ -106,6 +107,8 @@ export function toJobCardView(item: JobCardRecord): JobCardView {
     completedAt: item.completedAt?.toISOString() ?? null,
     companyName: companyName(item.organization),
     publicToken: item.publicToken,
+    stockNote: item.stockNote,
+    quoteDocumentId: item.quoteDocumentId,
   };
 }
 
@@ -204,6 +207,24 @@ export async function applyJobCardPatch(existing: JobCard, patch: JobCardPatch) 
   }
 
   const photos = await storePhotos(existing, patch.newPhotos);
+  let stockNote = existing.stockNote;
+  if (status === "done" && existing.status !== "done") {
+    try {
+      const note = await issuePartsForJob({
+        organizationId: existing.organizationId,
+        jobNumber: jobNumberFor(existing),
+        parts,
+        takenBy: next.mechanicName ?? "",
+        takenSignature: technicianSignature ?? "",
+        loggedBy: next.clientName ?? "",
+        loggedSignature: acceptSignature ?? "",
+      });
+      if (note) stockNote = note;
+    } catch (error) {
+      if (error instanceof StockError) throw new JobCardInputError(error.message);
+      throw error;
+    }
+  }
 
   return db.jobCard.update({
     where: { id: existing.id },
@@ -212,6 +233,7 @@ export async function applyJobCardPatch(existing: JobCard, patch: JobCardPatch) 
       photosJson: JSON.stringify(photos),
       partsJson: JSON.stringify(parts),
       partsCost,
+      stockNote,
       status,
       openSignedAt: openSignature ? existing.openSignedAt ?? now : existing.openSignedAt,
       technicianSignedAt: technicianSignature ? existing.technicianSignedAt ?? now : existing.technicianSignedAt,

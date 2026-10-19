@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { notifyNewTicket, redirectTo } from "@/lib/support";
+import { appOrigin, sendEmail } from "@/lib/email";
+import { allow } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
   const session = await getSession();
@@ -17,12 +19,13 @@ export async function POST(req: Request) {
       where: { id: ticketId, organizationId: session.organizationId },
       include: { organization: true, user: true },
     });
-    if (!ticket || ticket.status !== "open" || body.length < 2) {
-      return NextResponse.redirect(redirectTo(req, "/dashboard/support?error=1"));
-    }
+    if (!ticket) return NextResponse.redirect(redirectTo(req, "/dashboard/support"));
+    if (body.length < 2) return NextResponse.redirect(redirectTo(req, `/dashboard/support/${ticket.id}?error=short`));
+    if (!allow(`support:${session.userId}`, 30, 60 * 60_000)) return NextResponse.redirect(redirectTo(req, `/dashboard/support/${ticket.id}?error=busy`));
     await db.supportReply.create({
       data: { ticketId: ticket.id, userId: session.userId, body: body.slice(0, 4000) },
     });
+    if (ticket.status !== "open") await db.supportTicket.update({ where: { id: ticket.id }, data: { status: "open" } });
     const author = await db.user.findUnique({ where: { id: session.userId } });
     await notifyNewTicket({
       ticketId: ticket.id,
@@ -42,6 +45,9 @@ export async function POST(req: Request) {
   const productSlug = String(form.get("productSlug") ?? "").trim();
   if (subject.length < 3 || body.length < 10) {
     return NextResponse.redirect(redirectTo(req, "/dashboard/support?error=1"));
+  }
+  if (!allow(`support:${session.userId}`, 30, 60 * 60_000)) {
+    return NextResponse.redirect(redirectTo(req, "/dashboard/support?error=busy"));
   }
 
   const [org, user] = await Promise.all([
@@ -69,6 +75,15 @@ export async function POST(req: Request) {
     fromEmail: user.email,
     productSlug: ticket.productSlug,
     kind: "opened",
+  });
+  await sendEmail({
+    to: user.email,
+    organizationId: org.id,
+    kind: "ticket_received",
+    subject: `We received your ticket: ${ticket.subject}`,
+    greeting: `Hi ${user.fullName.split(" ")[0]},`,
+    lines: ["Thanks for getting in touch. Your support ticket is open and we will reply as soon as we can, usually within one working day.", `> ${ticket.body}`, "We will email you when we reply."],
+    button: { label: "Open the ticket", url: `${appOrigin()}/dashboard/support/${ticket.id}` },
   });
 
   return NextResponse.redirect(redirectTo(req, `/dashboard/support/${ticket.id}?sent=1`));

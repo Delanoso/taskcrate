@@ -78,6 +78,11 @@ export function JobCardEditor({
   const [workPhotos, setWorkPhotos] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [quoteRate, setQuoteRate] = useState("");
+  const [quoteClient, setQuoteClient] = useState(job.acceptName ?? "");
+  const [quoteEmail, setQuoteEmail] = useState("");
+  const [quotePhone, setQuotePhone] = useState("");
+  const [quoteNotice, setQuoteNotice] = useState<string | null>(null);
 
   useEffect(() => {
     setDraft(draftFrom(job));
@@ -296,6 +301,42 @@ export function JobCardEditor({
         )}
         <Button type="button" disabled={busy} onClick={() => save("done")}>Close job card</Button>
       </div>
+      {job.stockNote && <p className="text-sm">{job.stockNote}</p>}
+      {job.status === "done" && (
+        <div className="space-y-2 rounded-lg border p-3">
+          <p className="text-sm font-medium">{job.quoteDocumentId ? "Quotation already created" : "Turn this job into a quotation"}</p>
+          <p className="text-xs text-muted-foreground">Labour uses the hourly rate. Parts use the prices on this card. Quotations has to be open for this company.</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Input type="number" min="0" step="0.01" placeholder="Hourly rate (R)" value={quoteRate} onChange={(event) => setQuoteRate(event.target.value)} />
+            <Input placeholder="Client name" value={quoteClient} onChange={(event) => setQuoteClient(event.target.value)} />
+            <Input type="email" placeholder="Client email" value={quoteEmail} onChange={(event) => setQuoteEmail(event.target.value)} />
+            <Input placeholder="Client phone" value={quotePhone} onChange={(event) => setQuotePhone(event.target.value)} />
+          </div>
+          <Button type="button" variant="outline" disabled={busy} onClick={async () => {
+            setBusy(true);
+            setError(null);
+            try {
+              const data = await jsonFetch<{ number: string }>("/api/modules/jobcard/quote", {
+                method: "POST",
+                body: JSON.stringify({
+                  id: job.id,
+                  mode: job.mode,
+                  hourlyRate: Number(quoteRate || 0),
+                  clientName: quoteClient,
+                  clientEmail: quoteEmail,
+                  clientPhone: quotePhone,
+                }),
+              });
+              setQuoteNotice(`${data.number} is in Quotations. Email or WhatsApp it from that app.`);
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "Could not create the quotation");
+            } finally {
+              setBusy(false);
+            }
+          }}>{job.quoteDocumentId ? "Open the quotation again" : "Create quotation"}</Button>
+          {quoteNotice && <p className="text-sm text-green-700">{quoteNotice}</p>}
+        </div>
+      )}
     </form>
   );
 }

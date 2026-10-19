@@ -13,7 +13,7 @@ export default async function SupportTicketPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ sent?: string }>;
+  searchParams: Promise<{ sent?: string; error?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
@@ -51,23 +51,23 @@ export default async function SupportTicketPage({
           </li>
         ))}
       </ul>
-      {ticket.status === "open" ? (
-        <form action="/api/support" method="post" className="mt-6 max-w-xl space-y-3">
-          <input type="hidden" name="intent" value="reply" />
-          <input type="hidden" name="ticketId" value={ticket.id} />
-          <textarea
-            name="body"
-            required
-            minLength={2}
-            rows={4}
-            placeholder="Add more detail"
-            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base"
-          />
-          <Button type="submit">Send update</Button>
-        </form>
-      ) : (
-        <p className="mt-6 text-sm text-muted-foreground">This ticket is resolved.</p>
-      )}
+      {sp.error === "short" ? <p className="mt-4 text-sm text-destructive">Write a little more before sending.</p> : null}
+      {sp.error === "busy" ? <p className="mt-4 text-sm text-destructive">Too many messages in a short time. Please wait a few minutes.</p> : null}
+      {ticket.status !== "open" ? <p className="mt-6 text-sm text-muted-foreground">This ticket is resolved. Reply below if you still need help and it opens again.</p> : null}
+      <form action="/api/support" method="post" className="mt-4 max-w-xl space-y-3">
+        <input type="hidden" name="intent" value="reply" />
+        <input type="hidden" name="ticketId" value={ticket.id} />
+        <textarea
+          name="body"
+          required
+          minLength={2}
+          rows={4}
+          placeholder={ticket.status === "open" ? "Add more detail" : "What is still not right?"}
+          className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base"
+        />
+        <Button type="submit">{ticket.status === "open" ? "Send update" : "Reopen and send"}</Button>
+        <p className="text-xs text-muted-foreground">We email you when support replies.</p>
+      </form>
     </DashboardShell>
   );
 }

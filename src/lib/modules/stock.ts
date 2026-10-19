@@ -175,3 +175,92 @@ export async function recordMovement(input: MovementInput) {
     return { item: updated, movement };
   });
 }
+
+export type JobPartIssue = { name: string; qty: number };
+
+/** Takes matching parts off the shelf when a job card closes. Parts with no stock item stay on the card only. */
+export async function issuePartsForJob(input: {
+  organizationId: string;
+  jobNumber: string;
+  parts: JobPartIssue[];
+  takenBy: string;
+  takenSignature: string;
+  loggedBy: string;
+  loggedSignature: string;
+}) {
+  const wanted = input.parts
+    .map((part) => ({ name: part.name.trim(), qty: Math.round(part.qty) }))
+    .filter((part) => part.name && part.qty > 0);
+  if (!wanted.length) return null;
+
+  const already = await db.stockMovement.findFirst({
+    where: { jobRef: input.jobNumber, item: { organizationId: input.organizationId } },
+  });
+  if (already) return null;
+
+  const catalogue = await db.stockItem.findMany({ where: { organizationId: input.organizationId } });
+  if (!catalogue.length) return null;
+  const matched: { itemId: string; name: string; qty: number; onHand: number; reorderAt: number }[] = [];
+  const unmatched: string[] = [];
+  for (const part of wanted) {
+    const key = part.name.toLowerCase();
+    const item = catalogue.find((row) => row.name.trim().toLowerCase() === key || row.sku?.trim().toLowerCase() === key);
+    if (!item) {
+      unmatched.push(part.name);
+      continue;
+    }
+    const existing = matched.find((row) => row.itemId === item.id);
+    if (existing) existing.qty += part.qty;
+    else matched.push({ itemId: item.id, name: item.name, qty: part.qty, onHand: item.quantity, reorderAt: item.reorderAt });
+  }
+  for (const part of matched) {
+    if (part.qty > part.onHand) {
+      throw new StockError(`Only ${part.onHand} ${part.name} on hand, and this job needs ${part.qty}. Receive the stock, then close the job card.`);
+    }
+  }
+  if (!matched.length) {
+    return unmatched.length ? `Not on the stock list: ${unmatched.join(", ")}.` : null;
+  }
+
+  const takenBy = clean(input.takenBy, 120);
+  const loggedBy = clean(input.loggedBy, 120);
+  if (!takenBy || !loggedBy) throw new StockError("The technician and the person accepting the job must be named before parts come off stock.");
+  const takenSignature = signature(input.takenSignature, "The technician must sign before parts come off stock.");
+  const loggedSignature = signature(input.loggedSignature, "The person accepting the job must sign before parts come off stock.");
+
+  await db.$transaction(async (tx) => {
+    for (const part of matched) {
+      const balance = part.onHand - part.qty;
+      await tx.stockItem.update({ where: { id: part.itemId }, data: { quantity: balance } });
+      await tx.stockMovement.create({
+        data: {
+          itemId: part.itemId,
+          kind: "issue",
+          quantity: part.qty,
+          delta: -part.qty,
+          balanceAfter: balance,
+          partyName: takenBy,
+          partySignature: takenSignature,
+          loggedByName: loggedBy,
+          loggedBySignature: loggedSignature,
+          jobRef: input.jobNumber,
+          note: `Job card ${input.jobNumber}`,
+        },
+      });
+      if (part.onHand > part.reorderAt && balance <= part.reorderAt) {
+        await tx.notification.create({
+          data: {
+            organizationId: input.organizationId,
+            productSlug: "workshop-consumables",
+            title: "Reorder threshold breached",
+            body: `${part.name} now at ${balance} (reorder at ${part.reorderAt}), issued to ${input.jobNumber}`,
+          },
+        });
+      }
+    }
+  });
+
+  const issued = matched.map((part) => `${part.name} × ${part.qty}`).join(", ");
+  const extra = unmatched.length ? ` Not on the stock list: ${unmatched.join(", ")}.` : "";
+  return `Issued from stock: ${issued}.${extra}`;
+}

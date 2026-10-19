@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { parsePayrollRows, type PayrollImportRow } from "@/lib/modules/payroll-import";
 import { calculatePayslip, dobFromSaId, payDateFor, randsToCents } from "@/lib/modules/payroll-tax";
 import { aodDeductionsFor, matchDeductions, recordPayrollDeductions, reversePayrollDeductions } from "@/lib/modules/aod-payroll";
+import { attendanceHoursForPeriod, type ClockBucket } from "@/lib/modules/attendance-hours";
 
 export class PayrollError extends Error {}
 
@@ -15,6 +16,8 @@ const profileSchema = z.object({
   sdlNumber: optionalText(40),
   paySdl: z.boolean(),
   payDay: z.number().int().min(1).max(31),
+  monthlyHours: z.number().min(1).max(300).optional(),
+  overtimeMultiplier: z.number().min(1).max(3).optional(),
 });
 
 const employeeSchema = z.object({
@@ -101,6 +104,8 @@ export async function savePayrollProfile(organizationId: string, raw: unknown) {
     sdlNumber: blank(parsed.data.sdlNumber),
     paySdl: parsed.data.paySdl,
     payDay: parsed.data.payDay,
+    monthlyHours: parsed.data.monthlyHours ?? 173,
+    overtimeMultiplier: parsed.data.overtimeMultiplier ?? 1.5,
   };
   return db.payrollProfile.upsert({
     where: { organizationId },
@@ -220,6 +225,17 @@ async function writeImport(organizationId: string, rows: PayrollImportRow[]) {
   return { created, updated };
 }
 
+function matchClock(buckets: ClockBucket[], employee: { fullName: string; employeeNumber: string | null }) {
+  const number = employee.employeeNumber?.trim().toLowerCase();
+  if (number) {
+    const hit = buckets.find((bucket) => bucket.employeeNumber?.trim().toLowerCase() === number);
+    if (hit) return hit;
+  }
+  const name = employee.fullName.trim().toLowerCase();
+  const hits = buckets.filter((bucket) => bucket.fullName.trim().toLowerCase() === name);
+  return hits.length === 1 ? hits[0] : null;
+}
+
 export async function calculatePayroll(organizationId: string, period: string, extras: Record<string, number>) {
   if (!/^\d{4}-\d{2}$/.test(period)) throw new PayrollError("Choose a month");
   const profile = await db.payrollProfile.findUnique({ where: { organizationId } });
@@ -229,14 +245,27 @@ export async function calculatePayroll(organizationId: string, period: string, e
   const employees = await db.payrollEmployee.findMany({ where: { organizationId, active: true }, orderBy: { fullName: "asc" } });
   if (!employees.length) throw new PayrollError("Add at least one active employee");
   const payDate = payDateFor(period, profile.payDay);
-  const aod = matchDeductions(await aodDeductionsFor(organizationId, period), employees).byEmployee;
+  const [aod, clock] = await Promise.all([
+    aodDeductionsFor(organizationId, period).then((rows) => matchDeductions(rows, employees).byEmployee),
+    attendanceHoursForPeriod(organizationId, period),
+  ]);
+  const standardHours = profile.monthlyHours > 0 ? profile.monthlyHours : 173;
+  const multiplier = profile.overtimeMultiplier > 0 ? profile.overtimeMultiplier : 1.5;
   const lines = employees.map((employee) => {
     const onceOff = randsToCents(Number(extras[employee.id] ?? 0) || 0);
+    const clocked = matchClock(clock.buckets, employee);
+    const attendanceHours = clocked?.hours ?? null;
+    const overtimeHours = attendanceHours != null && attendanceHours > standardHours
+      ? Math.round((attendanceHours - standardHours) * 100) / 100
+      : 0;
+    const hourlyCents = standardHours > 0 ? employee.monthlySalaryCents / standardHours : 0;
+    const overtimeCents = Math.round(overtimeHours * hourlyCents * multiplier);
     const pay = calculatePayslip({
       period,
       basicCents: employee.monthlySalaryCents,
       allowanceCents: employee.allowanceCents,
       onceOffCents: Math.max(0, onceOff),
+      overtimeCents,
       pensionCents: employee.pensionCents,
       employerPensionCents: employee.employerPensionCents,
       medicalMember: employee.medicalMember,
@@ -250,6 +279,12 @@ export async function calculatePayroll(organizationId: string, period: string, e
     const debt = aod.get(employee.id);
     if (!employee.taxNumber) notes.push("No tax number on file.");
     if (!employee.accountNumber) notes.push("No bank account on file.");
+    if (clock.any && !clocked) notes.push("No clock times for this person this month.");
+    if (clocked && clocked.openShifts > 0) notes.push("A clock-in had no clock-out within 16 hours, so those hours were left out.");
+    if (attendanceHours != null && overtimeHours === 0 && attendanceHours < standardHours) {
+      notes.push(`Clocked ${attendanceHours} h against ${standardHours} h. The difference was not deducted.`);
+    }
+    if (overtimeHours > 0) notes.push(`Overtime ${overtimeHours} h at ${multiplier}× the hourly rate from the monthly salary.`);
     return {
       employeeId: employee.id,
       fullName: employee.fullName,
@@ -263,6 +298,9 @@ export async function calculatePayroll(organizationId: string, period: string, e
       basicCents: employee.monthlySalaryCents,
       allowanceCents: employee.allowanceCents,
       onceOffCents: Math.max(0, onceOff),
+      attendanceHours,
+      overtimeHours: overtimeHours || null,
+      overtimeCents,
       pensionCents: employee.pensionCents,
       employerPensionCents: employee.employerPensionCents,
       grossCents: pay.cashGrossCents,

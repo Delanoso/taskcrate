@@ -80,7 +80,12 @@ export default async function AdminTicketPage({ params }: { params: Promise<{ id
             className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-base"
           />
         </label>
-        <Button type="submit">Save reply</Button>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" name="resolve" value="1" className="size-4" />
+          Mark resolved with this reply
+        </label>
+        <Button type="submit">Send reply to {ticket.user.email}</Button>
+        <p className="text-xs text-muted-foreground">The customer gets your reply by email with a link back to the ticket.</p>
       </form>
     </DashboardShell>
   );

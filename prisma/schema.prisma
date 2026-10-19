@@ -49,6 +49,9 @@ model Organization {
   trialNote  String?
   trialNoticeSent Boolean @default(false)
   trialReminderSent Boolean @default(false)
+  trialFinalReminderSent Boolean @default(false)
+  trialEndedEmailSent Boolean @default(false)
+  winbackStage Int @default(0)
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
@@ -201,6 +204,8 @@ model DebitOrder {
   recurringAmount Float
   status          String       @default("active") // active|cancelled
   lastPaidAt      DateTime?
+  /// YYYY-MM of the month we already told them the debit did not arrive
+  missedAlertFor  String?
   cancelledAt     DateTime?
   cancelledBy     String?
   createdAt       DateTime     @default(now())
@@ -225,6 +230,26 @@ model BillingPayment {
   createdAt      DateTime     @default(now())
 
   @@index([organizationId])
+}
+
+model EmailLog {
+  id             String   @id @default(cuid())
+  organizationId String?
+  to             String
+  subject        String
+  kind           String
+  status         String
+  error          String?
+  createdAt      DateTime @default(now())
+
+  @@index([status, createdAt])
+}
+
+model JobRun {
+  name      String   @id
+  lastRunAt DateTime
+  lastOk    Boolean  @default(true)
+  lastNote  String?
 }
 
 model TrialClaim {
@@ -366,6 +391,10 @@ model WorkPermit {
   completionNotes  String?
   status           String       @default("sent") // sent|submitted|approved|completed|closed
   managerNotes     String?
+  /// People doing the work: [{name, employeeNumber}]
+  workersJson      String       @default("[]")
+  /// Set when the issuer lets the work start despite an expired ticket or a failed fit check
+  gateOverride     String?
   documentNumber   String?
   preWorkReceiverSigUrl    String?
   preWorkIssuerSigUrl      String?
@@ -1029,9 +1058,12 @@ model JobCard {
   acceptComment  String?
   acceptedAt     DateTime?
   startedAt      DateTime?
-  completedAt    DateTime?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  completedAt      DateTime?
+  /// What happened to parts when the job closed
+  stockNote        String?
+  quoteDocumentId  String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 }
 
 // ——— Workshop Stock ———
@@ -1306,6 +1338,9 @@ model BillingDocument {
   paymentMethod    String?
   paymentReference String?
   sourceQuoteId    String?
+  /// Link the client opens, without a TaskCrate login
+  publicToken      String?      @unique
+  sentToClientAt   DateTime?
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
@@ -1323,6 +1358,10 @@ model PayrollProfile {
   sdlNumber      String?
   paySdl         Boolean      @default(false)
   payDay         Int          @default(25)
+  /// Ordinary hours the monthly salary covers. Clocked time above this is overtime.
+  monthlyHours   Float        @default(173)
+  /// 1.5 is ordinary BCEA overtime
+  overtimeMultiplier Float    @default(1.5)
   updatedAt      DateTime     @updatedAt
 }
 
@@ -1390,6 +1429,9 @@ model PayrollLine {
   basicCents            Int              @default(0)
   allowanceCents        Int              @default(0)
   onceOffCents          Int              @default(0)
+  attendanceHours       Float?
+  overtimeHours         Float?
+  overtimeCents         Int              @default(0)
   pensionCents          Int              @default(0)
   employerPensionCents  Int              @default(0)
   grossCents            Int              @default(0)
@@ -1433,6 +1475,8 @@ model AttendancePunch {
   photoUrl       String
   signatureUrl   String
   note           String?
+  /// Written when a manager lets a blocked person clock in
+  gateOverride   String?
   createdAt      DateTime       @default(now())
 
   @@index([siteId])
@@ -1463,6 +1507,20 @@ model AccidentReport {
   injuredSignature  String?
   witnessName       String?
   witnessSignature  String?
+  /// filed|investigating|closed
+  status            String       @default("filed")
+  investigatorName  String?
+  findings          String?
+  rootCause         String?
+  correctiveAction  String?
+  lostTimeDays      Float?
+  /// Cost to recover, in cents. Used when an AOD is raised from this report.
+  costCents         Int          @default(0)
+  coidaReference    String?
+  nearMissId        String?
+  disciplineId      String?
+  aodId             String?
+  closedAt          DateTime?
   createdAt         DateTime     @default(now())
 
   @@unique([organizationId, reportNumber])

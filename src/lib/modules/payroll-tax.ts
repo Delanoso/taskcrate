@@ -30,6 +30,7 @@ export type PayInput = {
   basicCents: number;
   allowanceCents: number;
   onceOffCents: number;
+  overtimeCents?: number;
   pensionCents: number;
   employerPensionCents: number;
   medicalMember: boolean;
@@ -92,7 +93,7 @@ export function medicalCreditCents(member: boolean, dependants: number) {
 
 export function calculatePayslip(input: PayInput): PayResult {
   const notes: string[] = [];
-  const cashGross = input.basicCents + input.allowanceCents + input.onceOffCents;
+  const cashGross = input.basicCents + input.allowanceCents + input.onceOffCents + Math.max(0, input.overtimeCents ?? 0);
   const employerPension = Math.max(0, input.employerPensionCents);
   const employeePension = Math.max(0, input.pensionCents);
   const remuneration = cashGross + employerPension;

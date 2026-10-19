@@ -1,10 +1,14 @@
+import { randomBytes } from "crypto";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { appOrigin, sendEmail } from "@/lib/email";
 import { nextDocumentNumber } from "@/lib/modules/pdf-kit";
+import { isWaPhone, waLink } from "@/lib/phone";
 import {
   BUILTIN_TEMPLATES,
   addDays,
   emptyToNull,
+  formatMoney,
   isCurrency,
   priceTotals,
   todayIso,
@@ -343,4 +347,113 @@ export async function convertQuoteToInvoice(organizationId: string, id: string) 
     await db.billingDocument.update({ where: { id: quote.id }, data: { status: "ACCEPTED" } });
   }
   return invoice;
+}
+
+function clientToken() {
+  return randomBytes(16).toString("base64url");
+}
+
+/** A closed job card becomes a draft quotation. Labour uses the hourly rate; parts use the prices on the card. */
+export async function quoteFromJobCard(organizationId: string, input: {
+  jobNumber: string;
+  title: string;
+  hours: number | null;
+  hourlyRate: number;
+  parts: { name: string; qty: number; cost: number }[];
+  clientName: string;
+  clientEmail?: string | null;
+  clientPhone?: string | null;
+  existingQuoteId?: string | null;
+}) {
+  if (input.existingQuoteId) {
+    const existing = await db.billingDocument.findFirst({ where: { id: input.existingQuoteId, organizationId } });
+    if (existing) return existing;
+  }
+  const profile = await db.billingProfile.findUnique({ where: { organizationId } });
+  if (!profile) throw new BillingError("Save the company details in Quotations first. Then this job can become a quote.");
+  const lines: LineInput[] = [];
+  if (input.hours && input.hours > 0) {
+    if (!(input.hourlyRate > 0)) throw new BillingError("Add the hourly rate for the labour.");
+    lines.push({
+      description: `Labour: ${input.title} (${input.hours} h)`,
+      quantity: input.hours,
+      unit: "hour",
+      unitPrice: input.hourlyRate,
+    });
+  }
+  for (const part of input.parts) {
+    if (!part.name.trim() || !(part.qty > 0)) continue;
+    lines.push({ description: part.name.trim(), quantity: part.qty, unit: "each", unitPrice: part.cost });
+  }
+  if (!lines.length) throw new BillingError("Add hours or parts with a price before creating a quote.");
+  const chargeVat = profile.vatRegistered;
+  const vatPercent = chargeVat ? profile.vatPercent : 0;
+  const totals = priceTotals(lines, chargeVat, vatPercent);
+  const issueDate = todayIso();
+  const number = await nextDocumentNumber(organizationId, "QT");
+  return db.billingDocument.create({
+    data: {
+      organizationId,
+      kind: "QUOTE",
+      number,
+      status: "DRAFT",
+      currency: profile.defaultCurrency,
+      chargeVat,
+      vatPercent,
+      clientName: input.clientName.trim(),
+      clientEmail: input.clientEmail?.trim() || null,
+      clientPhone: input.clientPhone?.trim() || null,
+      issueDate,
+      dueDate: addDays(issueDate, profile.quoteValidDays),
+      theirReference: input.jobNumber,
+      notes: `From job card ${input.jobNumber}. ${input.title}`.slice(0, 2000),
+      terms: profile.terms,
+      linesJson: JSON.stringify(storedLines(lines)),
+      publicToken: clientToken(),
+      ...totals,
+    },
+  });
+}
+
+/** Emails the client a link, and returns a WhatsApp link when a phone number is on the document. */
+export async function sendBillingDocument(organizationId: string, id: string) {
+  const doc = await db.billingDocument.findFirst({ where: { id, organizationId } });
+  if (!doc) throw new BillingError("Document not found");
+  const token = doc.publicToken ?? clientToken();
+  if (!doc.publicToken) await db.billingDocument.update({ where: { id }, data: { publicToken: token } });
+  const url = `${appOrigin()}/p/document/${token}`;
+  const profile = await db.billingProfile.findUnique({ where: { organizationId } });
+  const from = profile?.tradingName || profile?.legalName || "We";
+  const kind = doc.kind === "QUOTE" ? "quotation" : "invoice";
+  const money = formatMoney(doc.totalCents, doc.currency);
+  let emailed = false;
+  if (doc.clientEmail) {
+    const result = await sendEmail({
+      to: doc.clientEmail,
+      organizationId,
+      kind: "billing_document",
+      subject: `${doc.number} from ${from}`,
+      lines: [
+        `${from} sent you ${kind} ${doc.number} for ${money}.`,
+        "Open it on your phone. The PDF is on that page.",
+      ],
+      button: { label: `Open the ${kind}`, url },
+    });
+    if (!result.ok) throw new BillingError(result.error);
+    emailed = true;
+  }
+  await db.billingDocument.update({
+    where: { id },
+    data: {
+      sentToClientAt: new Date(),
+      ...(doc.kind === "QUOTE" && doc.status === "DRAFT" ? { status: "SENT" } : {}),
+    },
+  });
+  return {
+    url,
+    waUrl: waLink(doc.clientPhone, `${from} sent you ${kind} ${doc.number} for ${money}: ${url}`),
+    emailed,
+    hasEmail: Boolean(doc.clientEmail),
+    hasPhone: isWaPhone(doc.clientPhone),
+  };
 }

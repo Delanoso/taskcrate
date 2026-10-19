@@ -470,6 +470,17 @@ export function BillingAdmin() {
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" variant="outline" asChild><a href={`/api/modules/billing/${row.id}/pdf`} target="_blank" rel="noreferrer">Download PDF</a></Button>
+                  <Button size="sm" variant="outline" onClick={async () => {
+                    setError(null);
+                    try {
+                      const sent = await jsonFetch<{ url: string; waUrl: string; emailed: boolean; hasPhone: boolean }>("/api/modules/billing", { method: "POST", body: JSON.stringify({ action: "send", id: row.id }) });
+                      await load();
+                      if (sent.hasPhone) window.open(sent.waUrl, "_blank", "noopener");
+                      setNotice(sent.emailed ? `Emailed to ${row.clientEmail}.` : sent.hasPhone ? "WhatsApp is open with the link." : `Copy this link for the client: ${sent.url}`);
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : "Could not send");
+                    }
+                  }}>Email / WhatsApp</Button>
                   {row.status !== "PAID" && <Button size="sm" variant="outline" onClick={() => edit(row)}>Edit</Button>}
                   {row.kind === "QUOTE" && row.status !== "SENT" && row.status !== "ACCEPTED" && row.status !== "DECLINED" && (
                     <Button size="sm" variant="outline" onClick={() => act({ action: "status", id: row.id, status: "SENT" }, "Marked as sent.")}>Mark sent</Button>

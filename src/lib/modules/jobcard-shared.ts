@@ -37,6 +37,8 @@ export type JobCardView = {
   completedAt: string | null;
   companyName: string;
   publicToken?: string;
+  stockNote?: string | null;
+  quoteDocumentId?: string | null;
 };
 
 export type JobCardSummary = {

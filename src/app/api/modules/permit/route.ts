@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { requireProductApi } from "@/lib/modules/api-guard";
 import { buildPermitClosedPdf, nextPermitDocumentNumber } from "@/lib/modules/permit-pdf";
 import { PERMIT_MAX_DURATION_MS } from "@/lib/modules/permit-options";
+import { dutyBlockReasons } from "@/lib/modules/duty-gate";
 import { saveDataUrlUpload } from "@/lib/uploads";
 
 export async function GET() {
@@ -133,6 +134,7 @@ const patchSchema = z.object({
   id: z.string(),
   status: z.enum(["approved", "closed"]),
   managerNotes: z.string().optional(),
+  gateOverride: z.string().trim().max(300).optional(),
   issuerSignatureDataUrl: z.string().startsWith("data:image/").optional(),
 });
 
@@ -174,6 +176,28 @@ export async function PATCH(req: Request) {
     );
   }
 
+  let blocked: string[] = [];
+  const override = body.gateOverride?.trim() ?? "";
+  if (body.status === "approved") {
+    let workers: { name?: string; employeeNumber?: string | null }[] = [];
+    try {
+      const parsedWorkers = JSON.parse(existing.workersJson || "[]");
+      if (Array.isArray(parsedWorkers)) workers = parsedWorkers;
+    } catch {
+      workers = [];
+    }
+    blocked = await dutyBlockReasons(gate.session.organizationId, [
+      ...(existing.contractorName ? [{ name: existing.contractorName }] : []),
+      ...workers.filter((worker) => worker.name).map((worker) => ({ name: worker.name!, employeeNumber: worker.employeeNumber })),
+    ]);
+    if (blocked.length && override.length < 12) {
+      return NextResponse.json(
+        { error: `Stopped: ${blocked.join(" ")} Write the reason below to let this permit through.` },
+        { status: 400 },
+      );
+    }
+  }
+
   const sigUrl = await saveDataUrlUpload(
     body.issuerSignatureDataUrl,
     `permits/${gate.session.organizationId}`,
@@ -186,6 +210,7 @@ export async function PATCH(req: Request) {
       data: {
         status: "approved",
         managerNotes: body.managerNotes || existing.managerNotes,
+        gateOverride: blocked.length ? override : existing.gateOverride,
         preWorkIssuerSigUrl: sigUrl,
         preWorkIssuerSignedAt: now,
       },

@@ -88,6 +88,7 @@ export default function Page() {
   const [form, setForm] = useState({
     contractorName: "",
     contractorPhone: "",
+    workers: "",
     specificLocation: "",
     equipmentId: "",
     workDetails: "",
@@ -177,6 +178,10 @@ export default function Page() {
                 action,
                 contractorName: form.contractorName,
                 contractorPhone: form.contractorPhone,
+                workers: form.workers.split("\n").map((line) => {
+                  const [name, employeeNumber] = line.split(",");
+                  return { name: name.trim(), employeeNumber: employeeNumber?.trim() || "" };
+                }).filter((worker) => worker.name.length >= 2),
                 specificLocation: form.specificLocation,
                 equipmentId: form.equipmentId,
                 workDetails: form.workDetails,
@@ -348,6 +353,16 @@ export default function Page() {
             value={form.contractorName}
             onChange={(e) => setField("contractorName", e.target.value)}
           />
+        </div>
+        <div className="space-y-2">
+          <Label>People doing the work</Label>
+          <textarea
+            className="min-h-16 w-full rounded-md border p-2 text-sm"
+            placeholder={"One person per line. Add an employee number after a comma.\nSipho Dlamini, E102"}
+            value={form.workers}
+            onChange={(e) => setField("workers", e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">An expired ticket or a failed fit check today stops the permit for that person.</p>
         </div>
         <div className="space-y-2">
           <Label>Phone (WhatsApp)</Label>

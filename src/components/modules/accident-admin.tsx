@@ -17,6 +17,17 @@ type Report = {
   injuredName: string;
   injury: string;
   reporterName: string;
+  status?: string;
+  investigatorName?: string | null;
+  findings?: string | null;
+  rootCause?: string | null;
+  correctiveAction?: string | null;
+  lostTimeDays?: number | null;
+  costCents?: number;
+  coidaReference?: string | null;
+  nearMissId?: string | null;
+  disciplineId?: string | null;
+  aodId?: string | null;
 };
 
 const empty = {
@@ -47,6 +58,8 @@ export function AccidentAdmin() {
   const [witnessSignature, setWitnessSignature] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [inv, setInv] = useState({ investigatorName: "", findings: "", rootCause: "", correctiveAction: "", lostTimeDays: "", cost: "", coidaReference: "" });
 
   async function load() {
     setReports((await jsonFetch<{ reports: Report[] }>("/api/modules/accident")).reports);
@@ -136,12 +149,47 @@ export function AccidentAdmin() {
           <Button size="sm" variant="outline" asChild><a href="/api/modules/accident/export">Download Excel</a></Button>
           {reports.length === 0 && <p className="text-sm text-muted-foreground">No reports yet.</p>}
           {reports.map((report) => (
-            <div key={report.id} className="rounded-md border p-3 text-sm">
+            <div key={report.id} className="space-y-2 rounded-md border p-3 text-sm">
               <p className="font-medium">{report.reportNumber} · {report.injuredName}</p>
-              <p className="text-muted-foreground">{report.occurredAt.replace("T", " ")} · {report.location}</p>
+              <p className="text-muted-foreground">{report.occurredAt.replace("T", " ")} · {report.location} · {report.status ?? "filed"}</p>
               <p>{report.injury}</p>
               <p className="text-muted-foreground">Filed by {report.reporterName}</p>
-              <a className="underline" href={`/api/modules/accident/${report.id}/pdf`} target="_blank" rel="noreferrer">Download PDF</a>
+              <div className="flex flex-wrap gap-3">
+                <a className="underline" href={`/api/modules/accident/${report.id}/pdf`} target="_blank" rel="noreferrer">Report PDF</a>
+                <a className="underline" href={`/api/modules/accident/${report.id}/pdf?pack=coida`} target="_blank" rel="noreferrer">COIDA pack</a>
+                <button type="button" className="underline" onClick={() => {
+                  setOpenId(openId === report.id ? null : report.id);
+                  setInv({
+                    investigatorName: report.investigatorName ?? "",
+                    findings: report.findings ?? "",
+                    rootCause: report.rootCause ?? "",
+                    correctiveAction: report.correctiveAction ?? "",
+                    lostTimeDays: report.lostTimeDays == null ? "" : String(report.lostTimeDays),
+                    cost: report.costCents ? String(report.costCents / 100) : "",
+                    coidaReference: report.coidaReference ?? "",
+                  });
+                }}>Investigation</button>
+              </div>
+              {openId === report.id && (
+                <div className="grid gap-2 border-t pt-2">
+                  <Label className="space-y-1">Investigator<Input value={inv.investigatorName} onChange={(e) => setInv({ ...inv, investigatorName: e.target.value })} /></Label>
+                  <Label className="space-y-1">Findings<textarea className="min-h-16 w-full rounded-md border p-2 text-sm" value={inv.findings} onChange={(e) => setInv({ ...inv, findings: e.target.value })} /></Label>
+                  <Label className="space-y-1">Root cause<textarea className="min-h-16 w-full rounded-md border p-2 text-sm" value={inv.rootCause} onChange={(e) => setInv({ ...inv, rootCause: e.target.value })} /></Label>
+                  <Label className="space-y-1">Corrective action<textarea className="min-h-16 w-full rounded-md border p-2 text-sm" value={inv.correctiveAction} onChange={(e) => setInv({ ...inv, correctiveAction: e.target.value })} /></Label>
+                  <Label className="space-y-1">Days off work<Input type="number" min="0" value={inv.lostTimeDays} onChange={(e) => setInv({ ...inv, lostTimeDays: e.target.value })} /></Label>
+                  <Label className="space-y-1">Cost to recover (R)<Input type="number" min="0" step="0.01" value={inv.cost} onChange={(e) => setInv({ ...inv, cost: e.target.value })} /></Label>
+                  <Label className="space-y-1">Compensation Fund reference<Input value={inv.coidaReference} onChange={(e) => setInv({ ...inv, coidaReference: e.target.value })} /></Label>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" size="sm" variant="outline" onClick={() => jsonFetch("/api/modules/accident", { method: "POST", body: JSON.stringify({ action: "investigate", id: report.id, ...inv, lostTimeDays: inv.lostTimeDays === "" ? undefined : Number(inv.lostTimeDays), cost: inv.cost === "" ? undefined : Number(inv.cost) }) }).then(() => { setNotice("Investigation saved."); return load(); }).catch((err) => setError(err instanceof Error ? err.message : "Could not save"))}>Save investigation</Button>
+                    <Button type="button" size="sm" onClick={() => jsonFetch("/api/modules/accident", { method: "POST", body: JSON.stringify({ action: "close", id: report.id, ...inv, lostTimeDays: inv.lostTimeDays === "" ? undefined : Number(inv.lostTimeDays), cost: inv.cost === "" ? undefined : Number(inv.cost) }) }).then(() => { setNotice("Investigation closed."); return load(); }).catch((err) => setError(err instanceof Error ? err.message : "Could not close"))}>Close investigation</Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" size="sm" variant="outline" disabled={Boolean(report.nearMissId)} onClick={() => jsonFetch("/api/modules/accident", { method: "POST", body: JSON.stringify({ action: "link", id: report.id, link: "nearmiss" }) }).then(() => { setNotice("Near-miss opened."); return load(); }).catch((err) => setError(err instanceof Error ? err.message : "Could not open it"))}>{report.nearMissId ? "Near-miss opened" : "Open a near-miss"}</Button>
+                    <Button type="button" size="sm" variant="outline" disabled={Boolean(report.disciplineId)} onClick={() => jsonFetch("/api/modules/accident", { method: "POST", body: JSON.stringify({ action: "link", id: report.id, link: "discipline" }) }).then(() => { setNotice("Discipline case opened. Run the hearing there."); return load(); }).catch((err) => setError(err instanceof Error ? err.message : "Could not open it"))}>{report.disciplineId ? "Discipline case opened" : "Open a discipline case"}</Button>
+                    <Button type="button" size="sm" variant="outline" disabled={Boolean(report.aodId)} onClick={() => jsonFetch("/api/modules/accident", { method: "POST", body: JSON.stringify({ action: "link", id: report.id, link: "aod" }) }).then(() => { setNotice("AOD raised. Set the plan and get it signed before anything is deducted."); return load(); }).catch((err) => setError(err instanceof Error ? err.message : "Could not raise it"))}>{report.aodId ? "AOD raised" : "Raise an AOD"}</Button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </CardContent>

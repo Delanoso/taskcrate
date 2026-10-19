@@ -41,7 +41,7 @@ export default async function SupportPage({
         <p className="mt-4 rounded-lg border bg-card px-4 py-3 text-sm">Ticket saved.</p>
       ) : null}
       {sp.error ? (
-        <p className="mt-4 text-sm text-destructive">Add a short subject and describe the problem.</p>
+        <p className="mt-4 text-sm text-destructive">{sp.error === "busy" ? "Too many tickets in a short time. Please wait a few minutes." : "Add a short subject and describe the problem."}</p>
       ) : null}
       {!mailConfigured() ? (
         <p className="mt-4 text-sm text-muted-foreground">

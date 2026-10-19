@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { dutyBlockReasons } from "@/lib/modules/duty-gate";
 import { saveDataUrlUpload } from "@/lib/uploads";
 import {
   isHazardKey,
@@ -52,6 +53,14 @@ const submitSchema = z.object({
   areaPhotoDataUrl: dataImage("Add a work area photo."),
   equipmentPhotoDataUrl: dataImage("Add a safety equipment photo."),
   receiverSignatureDataUrl: dataImage("The receiver must sign before submitting."),
+  workers: z
+    .array(z.object({
+      name: z.string().trim().min(2).max(160),
+      employeeNumber: z.string().trim().max(40).optional().or(z.literal("")),
+    }))
+    .max(30)
+    .optional()
+    .default([]),
 });
 
 const completeSchema = z.object({
@@ -94,6 +103,16 @@ export async function POST(
         );
       }
       const body = submitSchema.parse(raw);
+      const blocked = await dutyBlockReasons(item.organizationId, [
+        { name: body.contractorName },
+        ...body.workers.map((worker) => ({ name: worker.name, employeeNumber: worker.employeeNumber })),
+      ]);
+      if (blocked.length) {
+        return NextResponse.json(
+          { error: `Stopped: ${blocked.join(" ")} Renew the ticket or pass today's fit check, then submit again.` },
+          { status: 400 },
+        );
+      }
       const missing = requiredPrecautions(body.hazards).find(
         (p) => !body.precautions.includes(p.key),
       );
@@ -124,6 +143,10 @@ export async function POST(
           equipmentPhotoUrl,
           preWorkReceiverSigUrl,
           preWorkReceiverSignedAt: new Date(),
+          workersJson: JSON.stringify(body.workers.map((worker) => ({
+            name: worker.name,
+            employeeNumber: worker.employeeNumber?.trim() || null,
+          }))),
           status: "submitted",
         },
       });

@@ -13,6 +13,7 @@ export default function Page() {
   const [fullName, setFullName] = useState("");
   const [employeeNumber, setEmployeeNumber] = useState("");
   const [note, setNote] = useState("");
+  const [overrideReason, setOverrideReason] = useState("");
   const [photo, setPhoto] = useState<string | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
   const [formKey, setFormKey] = useState(0);
@@ -38,7 +39,7 @@ export default function Page() {
     const res = await fetch(`/api/modules/attendance/public/${token}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ direction, fullName, employeeNumber, note, photoDataUrl: photo, signatureDataUrl: signature }),
+      body: JSON.stringify({ direction, fullName, employeeNumber, note, overrideReason, photoDataUrl: photo, signatureDataUrl: signature }),
     });
     const data = await res.json().catch(() => ({}));
     setBusy(false);
@@ -74,6 +75,11 @@ export default function Page() {
         <Label className="space-y-1">Full name<Input value={fullName} onChange={(e) => setFullName(e.target.value)} required /></Label>
         <Label className="space-y-1">Employee number<Input value={employeeNumber} onChange={(e) => setEmployeeNumber(e.target.value)} /></Label>
         <Label className="space-y-1">Note<Input value={note} onChange={(e) => setNote(e.target.value)} /></Label>
+        {direction === "IN" && error?.startsWith("Stopped:") && (
+          <Label className="space-y-1">Manager's reason to allow this clock-in
+            <Input value={overrideReason} onChange={(e) => setOverrideReason(e.target.value)} placeholder="Why this person may start" />
+          </Label>
+        )}
         <PhotoInput key={`photo-${formKey}`} label="Photo" onChange={setPhoto} capture="user" />
         <div>
           <p className="mb-1 text-sm font-medium">Signature</p>

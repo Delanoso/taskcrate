@@ -43,6 +43,9 @@ type Line = {
   pensionCents: number;
   medicalDeductionCents: number;
   otherDeductionCents: number;
+  attendanceHours: number | null;
+  overtimeHours: number | null;
+  overtimeCents: number;
   netCents: number;
   employerCostCents: number;
   note: string | null;
@@ -132,7 +135,7 @@ function personFrom(employee: Employee): PersonForm {
 
 export function PayrollAdmin() {
   const [panel, setPanel] = useState<"setup" | "person" | "import" | "run">("setup");
-  const [profile, setProfile] = useState({ payeNumber: "", uifNumber: "", sdlNumber: "", paySdl: false, payDay: "25" });
+  const [profile, setProfile] = useState({ payeNumber: "", uifNumber: "", sdlNumber: "", paySdl: false, payDay: "25", monthlyHours: "173", overtimeMultiplier: "1.5" });
   const [hasProfile, setHasProfile] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [runs, setRuns] = useState<Run[]>([]);
@@ -144,7 +147,7 @@ export function PayrollAdmin() {
   const [notice, setNotice] = useState<string | null>(null);
 
   async function load() {
-    const data = await jsonFetch<{ profile: { payeNumber: string; uifNumber: string; sdlNumber: string | null; paySdl: boolean; payDay: number } | null; employees: Employee[]; runs: Run[] }>("/api/modules/payroll");
+    const data = await jsonFetch<{ profile: { payeNumber: string; uifNumber: string; sdlNumber: string | null; paySdl: boolean; payDay: number; monthlyHours?: number; overtimeMultiplier?: number } | null; employees: Employee[]; runs: Run[] }>("/api/modules/payroll");
     setEmployees(data.employees);
     setRuns(data.runs);
     setHasProfile(Boolean(data.profile));
@@ -155,6 +158,8 @@ export function PayrollAdmin() {
         sdlNumber: data.profile.sdlNumber ?? "",
         paySdl: data.profile.paySdl,
         payDay: String(data.profile.payDay),
+        monthlyHours: String(data.profile.monthlyHours ?? 173),
+        overtimeMultiplier: String(data.profile.overtimeMultiplier ?? 1.5),
       });
     }
     return data;
@@ -175,7 +180,7 @@ export function PayrollAdmin() {
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await run({ action: "profile", ...profile, payDay: Number(profile.payDay) }, "Payroll setup saved.");
+      await run({ action: "profile", ...profile, payDay: Number(profile.payDay), monthlyHours: Number(profile.monthlyHours), overtimeMultiplier: Number(profile.overtimeMultiplier) }, "Payroll setup saved.");
       setPanel("person");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save");
@@ -256,6 +261,8 @@ export function PayrollAdmin() {
               </label>
               <Label className="space-y-1">SDL number<Input value={profile.sdlNumber} onChange={(e) => setProfile((p) => ({ ...p, sdlNumber: e.target.value  }))} /></Label>
               <Label className="space-y-1">Pay day of the month<Input type="number" min="1" max="31" value={profile.payDay} onChange={(e) => setProfile((p) => ({ ...p, payDay: e.target.value  }))} required /></Label>
+              <Label className="space-y-1">Ordinary hours in the month<Input type="number" min="1" max="300" step="0.5" value={profile.monthlyHours} onChange={(e) => setProfile((p) => ({ ...p, monthlyHours: e.target.value }))} required /></Label>
+              <Label className="space-y-1">Overtime multiple<Input type="number" min="1" max="3" step="0.1" value={profile.overtimeMultiplier} onChange={(e) => setProfile((p) => ({ ...p, overtimeMultiplier: e.target.value }))} required /></Label>
               <Button type="submit" className="sm:col-span-2 sm:w-fit">Save payroll setup</Button>
             </form>
           </CardContent>
@@ -355,7 +362,7 @@ export function PayrollAdmin() {
           <CardHeader>
             <CardTitle>Run the month</CardTitle>
             <CardDescription>
-              {hasProfile ? "Active people are calculated from the setup. A once-off amount is taxed in this month only. Finalising locks the month until you reopen it." : "Save the PAYE and UIF setup first."}
+              {hasProfile ? "Active people are calculated from the setup. Clocked hours above the ordinary month are paid as overtime. A once-off amount is taxed in this month only. Finalising locks the month until you reopen it." : "Save the PAYE and UIF setup first."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -384,7 +391,7 @@ export function PayrollAdmin() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="text-left text-xs text-muted-foreground">
-                        <th className="p-1">Name</th><th className="p-1">Once-off</th><th className="p-1">Gross</th><th className="p-1">PAYE</th><th className="p-1">UIF</th><th className="p-1">Net</th><th className="p-1"></th>
+                        <th className="p-1">Name</th><th className="p-1">Once-off</th><th className="p-1">Hours</th><th className="p-1">Overtime</th><th className="p-1">Gross</th><th className="p-1">PAYE</th><th className="p-1">UIF</th><th className="p-1">Net</th><th className="p-1"></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -394,6 +401,8 @@ export function PayrollAdmin() {
                           <td className="p-1">
                             <Input className="h-8 w-24" type="number" min="0" step="0.01" disabled={current.status === "FINALISED"} value={extras[line.employeeId ?? ""] ?? ""} placeholder="0" onChange={(e) => setExtras({ ...extras, [line.employeeId ?? ""]: e.target.value })} />
                           </td>
+                          <td className="p-1">{line.attendanceHours ?? "—"}</td>
+                          <td className="p-1">{line.overtimeCents ? formatRand(line.overtimeCents) : "—"}</td>
                           <td className="p-1">{formatRand(line.grossCents)}</td>
                           <td className="p-1">{formatRand(line.payeCents)}</td>
                           <td className="p-1">{formatRand(line.uifEmployeeCents)}</td>

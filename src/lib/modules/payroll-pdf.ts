@@ -52,6 +52,8 @@ export async function buildPayslipPdf(organizationId: string, lineId: string) {
   doc.field("Basic salary", formatRand(line.basicCents));
   if (line.allowanceCents) doc.field("Taxable allowances", formatRand(line.allowanceCents));
   if (line.onceOffCents) doc.field("Once-off this month", formatRand(line.onceOffCents));
+  if (line.attendanceHours != null) doc.field("Clocked hours", String(line.attendanceHours));
+  if (line.overtimeCents) doc.field(`Overtime${line.overtimeHours ? ` (${line.overtimeHours} h)` : ""}`, formatRand(line.overtimeCents));
   doc.field("Gross pay", formatRand(line.grossCents));
 
   doc.heading("Deductions");

@@ -8,6 +8,7 @@ import {
   saveBillingDocument,
   saveBillingProfile,
   saveBillingTemplate,
+  sendBillingDocument,
   setBillingStatus,
 } from "@/lib/modules/billing";
 
@@ -35,6 +36,7 @@ export async function POST(req: Request) {
     if (action === "document") return NextResponse.json({ document: await saveBillingDocument(org, body) });
     if (action === "status") return NextResponse.json({ document: await setBillingStatus(org, body) });
     if (action === "convert") return NextResponse.json({ document: await convertQuoteToInvoice(org, String(body?.id ?? "")) });
+    if (action === "send") return NextResponse.json(await sendBillingDocument(org, String(body?.id ?? "")));
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   } catch (error) {
     if (error instanceof BillingError) return NextResponse.json({ error: error.message }, { status: 400 });

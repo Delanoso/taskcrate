@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { photoSchema } from "@/lib/modules/common";
+import { dutyBlockReasons } from "@/lib/modules/duty-gate";
 import { saveDataUrlUpload } from "@/lib/uploads";
 
 export class AttendanceError extends Error {}
@@ -10,6 +11,7 @@ const punchSchema = z.object({
   fullName: z.string().trim().min(2, "Add the name").max(160),
   employeeNumber: z.string().trim().max(40).optional().or(z.literal("")),
   note: z.string().trim().max(300).optional().or(z.literal("")),
+  overrideReason: z.string().trim().max(300).optional().or(z.literal("")),
   photoDataUrl: photoSchema,
   signatureDataUrl: photoSchema,
 });
@@ -101,6 +103,15 @@ export async function clockAttendance(site: { id: string; organizationId: string
   if (data.direction === "OUT" && last?.direction !== "IN") {
     throw new AttendanceError(`${data.fullName} is not clocked in at this site.`);
   }
+  let gateOverride: string | null = null;
+  if (data.direction === "IN") {
+    const reasons = await dutyBlockReasons(site.organizationId, [{ name: data.fullName, employeeNumber: number }]);
+    const reason = data.overrideReason?.trim() ?? "";
+    if (reasons.length && reason.length < 12) {
+      throw new AttendanceError(`Stopped: ${reasons.join(" ")} A manager can allow it by writing the reason below (at least a short sentence) and clocking in again.`);
+    }
+    if (reasons.length) gateOverride = reason;
+  }
   const folder = `attendance/${site.organizationId}`;
   const [photoUrl, signatureUrl] = await Promise.all([
     saveDataUrlUpload(data.photoDataUrl, folder),
@@ -113,6 +124,7 @@ export async function clockAttendance(site: { id: string; organizationId: string
       fullName: data.fullName,
       employeeNumber: number,
       note: data.note?.trim() || null,
+      gateOverride,
       photoUrl,
       signatureUrl,
     },

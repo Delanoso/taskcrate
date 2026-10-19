@@ -97,6 +97,7 @@ export function PermitAdmin() {
   const [signing, setSigning] = useState<SignMode | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
+  const [gateOverride, setGateOverride] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const appUrl = typeof window !== "undefined" ? window.location.origin : "";
 
@@ -183,6 +184,7 @@ export function PermitAdmin() {
           id,
           status,
           managerNotes: notes || undefined,
+          gateOverride: gateOverride || undefined,
           issuerSignatureDataUrl: signature,
         }),
       });
@@ -441,6 +443,13 @@ export function PermitAdmin() {
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
                       />
+                      {signing.status === "approved" && (
+                        <Input
+                          placeholder="Reason, if a ticket or fit check is blocking someone"
+                          value={gateOverride}
+                          onChange={(e) => setGateOverride(e.target.value)}
+                        />
+                      )}
                       <div className="flex gap-2">
                         <Button size="sm" disabled={busyId === i.id} onClick={confirmSigning}>
                           {busyId === i.id
