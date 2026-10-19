@@ -195,18 +195,17 @@ function JobCardAdmin({ mode }: { mode: JobMode }) {
             </div>
           )}
           <JobCardSheet job={selected} />
-          {selected.status !== "done" && (
-            <JobCardEditor
-              job={selected}
-              saveUrl="/api/modules/jobcard"
-              method="PATCH"
-              extraBody={{ id: selected.id, mode }}
-              onSaved={(job) => {
-                setSelected(job);
-                load().catch(() => undefined);
-              }}
-            />
-          )}
+          <JobCardEditor
+            job={selected}
+            saveUrl="/api/modules/jobcard"
+            method="PATCH"
+            extraBody={{ id: selected.id, mode }}
+            quoteOnly={selected.status === "done"}
+            onSaved={(job) => {
+              setSelected(job);
+              load().catch(() => undefined);
+            }}
+          />
         </div>
       )}
     </div>

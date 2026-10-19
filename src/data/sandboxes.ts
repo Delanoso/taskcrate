@@ -205,6 +205,56 @@ const SERVER: Record<string, ProductSandbox> = {
     successTitle: "State Transition Success",
     successBody: "Immutable OB entry written. Wake timer reset.",
   },
+  "accident-report": {
+    screenTitle: "Accident report",
+    subtitle: "Supervisor phone",
+    steps: [
+      { id: "file", label: "Record who was hurt and where" },
+      { id: "investigate", label: "Add findings and the COIDA pack" },
+    ],
+    successTitle: "Report on file",
+    successBody: "The company is emailed. An open investigation comes back each morning.",
+  },
+  payroll: {
+    screenTitle: "Payroll",
+    subtitle: "Month end",
+    steps: [
+      { id: "run", label: "Calculate the month" },
+      { id: "pack", label: "Download EMP201 figures and the bank file" },
+    ],
+    successTitle: "Month finalised",
+    successBody: "Payslips are locked. TaskCrate does not submit the return to SARS.",
+  },
+  "training-tickets": {
+    screenTitle: "Training tickets",
+    subtitle: "Site file",
+    steps: [
+      { id: "card", label: "Photograph the ticket and the expiry" },
+      { id: "gate", label: "An expired ticket stops clock-in" },
+    ],
+    successTitle: "Ticket on file",
+    successBody: "Expiry is emailed. Renew it from Due or expired.",
+  },
+  "site-attendance": {
+    screenTitle: "Site attendance",
+    subtitle: "Gate QR",
+    steps: [
+      { id: "in", label: "Clock in with a photo" },
+      { id: "hours", label: "Hours land on the payslip" },
+    ],
+    successTitle: "Shift recorded",
+    successBody: "Someone still clocked in yesterday is on the morning list.",
+  },
+  quotations: {
+    screenTitle: "Quotation",
+    subtitle: "Client link",
+    steps: [
+      { id: "quote", label: "Write the quotation" },
+      { id: "send", label: "Email and WhatsApp the client" },
+    ],
+    successTitle: "Sent to the client",
+    successBody: "They open it on their phone. Mark it accepted, then invoice.",
+  },
   "fit-for-duty": {
     screenTitle: "Fit-for-duty",
     subtitle: "Entry QR",
